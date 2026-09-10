@@ -5,7 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, ShoppingCart, User, Menu, X, Bell, Heart, MapPin, MessageSquare,
-  Home, LayoutGrid, LogOut, Package, Settings, ChevronDown, Store, Sparkles, ShieldCheck, Sun, Moon
+  Home, LayoutGrid, LogOut, Package, Settings, ChevronDown, Store, Sparkles, ShieldCheck, Sun, Moon,
+  Smartphone, Headphones, Footprints
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -252,15 +253,21 @@ export default function ClientLayout() {
                     )
                   ) : (
                     <div className="space-y-2 p-1">
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Tendance à Bouaké 🔥</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Tendance à Bouaké</p>
                       <div className="flex flex-wrap gap-1.5">
-                        {['🇨🇮 Pagne Baoulé', '📱 Smartphones 5G', '🎧 Écouteurs', '👟 Sneakers'].map((tag) => (
+                        {[
+                          { label: 'Pagne Baoulé', icon: Store },
+                          { label: 'Smartphones 5G', icon: Smartphone },
+                          { label: 'Écouteurs', icon: Headphones },
+                          { label: 'Sneakers', icon: Footprints },
+                        ].map(({ label, icon: Icon }) => (
                           <button
-                            key={tag}
-                            onClick={() => { setSearchQuery(tag.replace(/^[^\s]+\s/, '')); }}
-                            className="text-[11px] font-bold bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl transition-all"
+                            key={label}
+                            onClick={() => { setSearchQuery(label); }}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-3 py-1.5 rounded-xl transition-all"
                           >
-                            {tag}
+                            <Icon size={12} className="text-orange-400" />
+                            {label}
                           </button>
                         ))}
                       </div>
@@ -572,7 +579,7 @@ export default function ClientLayout() {
               </ul>
             </div>
             <div>
-              <h4 className="text-white text-xs font-bold uppercase tracking-wider mb-4">Paiements Sécurisés 🇨🇮</h4>
+              <h4 className="flex items-center gap-1.5 text-white text-xs font-bold uppercase tracking-wider mb-4"><ShieldCheck size={13} className="text-emerald-400" /> Paiements Sécurisés</h4>
               <PaymentMethodsRow size={28} showLabel={true} className="flex-col items-start gap-2.5" />
             </div>
           </div>
