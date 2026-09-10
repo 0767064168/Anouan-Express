@@ -62,7 +62,7 @@ export default function FavoritesPage() {
             <div>
               <h2 className="text-xl font-black text-white mb-2">Aucun favori pour l'instant</h2>
               <p className="text-slate-400 text-sm">
-                Cliquez sur le ❤️ d'un produit pour l'ajouter à votre liste de souhaits.
+                Cliquez sur le <Heart size={14} className="inline-block text-orange-400 align-text-bottom" /> d'un produit pour l'ajouter à votre liste de souhaits.
               </p>
             </div>
             <Link
@@ -87,7 +87,7 @@ export default function FavoritesPage() {
                   <Link to={`/products/${product.id}`} className="block relative">
                     {product.isCultural && (
                       <span className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[10px] font-black px-3 py-1 rounded-full z-10 shadow-lg uppercase tracking-wider">
-                        🇨🇮 Artisanat CI
+                        <span className="inline-flex items-center gap-1"><Sparkles size={11} /> Artisanat CI</span>
                       </span>
                     )}
                     <div className="h-48 bg-slate-900 overflow-hidden relative">

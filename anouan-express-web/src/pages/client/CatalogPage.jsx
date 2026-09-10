@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, ShoppingCart, Star, SlidersHorizontal, ArrowRight, Loader2, Sparkles, Award, Heart, X } from 'lucide-react';
+import { Search, Filter, ShoppingCart, Star, SlidersHorizontal, ArrowRight, Loader2, Sparkles, Award, Heart, X, ShieldCheck } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
 import { useFavorites } from '../../contexts/FavoritesContext';
@@ -174,7 +174,7 @@ export default function CatalogPage() {
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
             <div>
               <span className="text-xs font-black uppercase tracking-widest text-amber-400 flex items-center gap-1.5 mb-2">
-                <Award size={16} className="text-amber-400 animate-bounce" /> 🇨🇮 Produits Qualifiés & Artisanat Ivoirien
+                <ShieldCheck size={16} className="text-emerald-400" /> Produits Qualifiés & Artisanat Ivoirien
               </span>
               <h1 className="text-3xl md:text-4xl font-black text-white tracking-tight">
                 {searchQ ? `Résultats pour "${searchQ}"` : 'Catalogue Général & Créations de Côte d\'Ivoire'}

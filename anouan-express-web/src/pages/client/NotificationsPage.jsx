@@ -17,11 +17,11 @@ const DEMO_NOTIFS = [
 ];
 
 const TYPE_LABELS = {
-  all:      'Toutes',
-  order:    '📦 Commandes',
-  promo:    '🔥 Promotions',
-  security: '🔒 Sécurité',
-  system:   'ℹ️ Système',
+  all:      { label: 'Toutes', icon: Bell },
+  order:    { label: 'Commandes', icon: Package },
+  promo:    { label: 'Promotions', icon: Tag },
+  security: { label: 'Sécurité', icon: ShieldCheck },
+  system:   { label: 'Système', icon: Info },
 };
 
 export default function NotificationsPage() {
@@ -129,7 +129,7 @@ export default function NotificationsPage() {
 
         {/* Filtres par type */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">
-          {Object.entries(TYPE_LABELS).map(([key, label]) => (
+          {Object.entries(TYPE_LABELS).map(([key, { label, icon: Icon }]) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
@@ -139,7 +139,7 @@ export default function NotificationsPage() {
                   : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-orange-500/30 hover:text-white'
               }`}
             >
-              {label}
+              <span className="inline-flex items-center gap-1.5"><Icon size={13} /> {label}</span>
             </button>
           ))}
         </div>

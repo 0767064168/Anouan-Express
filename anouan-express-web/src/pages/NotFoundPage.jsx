@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home, ArrowLeft, Zap } from 'lucide-react';
+import { Home, ArrowLeft, Zap, ShoppingBag, LogIn, UserPlus } from 'lucide-react';
 import Logo from '../components/ui/Logo';
 
 export default function NotFoundPage() {
@@ -63,16 +63,16 @@ export default function NotFoundPage() {
           <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Liens rapides</p>
           <div className="flex flex-wrap gap-3 justify-center">
             {[
-              { to: '/catalog', label: '🛍️ Catalogue' },
-              { to: '/auth/login', label: '🔐 Connexion' },
-              { to: '/auth/register', label: '✨ Inscription' },
+              { to: '/catalog', label: 'Catalogue', icon: ShoppingBag },
+              { to: '/auth/login', label: 'Connexion', icon: LogIn },
+              { to: '/auth/register', label: 'Inscription', icon: UserPlus },
             ].map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
                 className="text-xs text-orange-400 hover:text-orange-300 font-bold bg-orange-500/10 border border-orange-500/20 px-4 py-2 rounded-xl transition-all hover:bg-orange-500/20"
               >
-                {link.label}
+                <span className="inline-flex items-center gap-1.5"><link.icon size={13} /> {link.label}</span>
               </Link>
             ))}
           </div>
