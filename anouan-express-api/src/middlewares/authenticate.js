@@ -12,17 +12,16 @@ const { AppError } = require('./errorHandler');
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    // EventSource (SSE) ne supporte pas les headers custom → fallback query param
-    const queryToken = req.query?.token;
-    
-    if (!authHeader && !queryToken) {
+    const cookieToken = req.cookies?.accessToken;
+
+    if (!authHeader && !cookieToken) {
       throw new AppError('Authentification requise.', 401, 'MISSING_TOKEN');
     }
     if (authHeader && !authHeader.startsWith('Bearer ')) {
       throw new AppError('Authentification requise.', 401, 'MISSING_TOKEN');
     }
 
-    const token = queryToken || authHeader.split(' ')[1];
+    const token = authHeader ? authHeader.split(' ')[1] : cookieToken;
     const decoded = jwt.verify(token, env.jwt.secret);
 
     // Vérification que l'utilisateur existe encore et est actif

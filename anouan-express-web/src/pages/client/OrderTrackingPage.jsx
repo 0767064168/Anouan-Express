@@ -14,7 +14,6 @@ export default function OrderTrackingPage() {
   const { id: orderId } = useParams();
   const toast = useToast();
 
-  const { token } = useAuth();
   const [order, setOrder] = useState(null);
   const [pickupCode, setPickupCode] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,10 +43,9 @@ export default function OrderTrackingPage() {
 
   // Écoute SSE en temps réel pour la commande
   useEffect(() => {
-    if (!token) return;
-    const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    const rawApiUrl = import.meta.env.VITE_API_URL || '/api';
     const apiBase = rawApiUrl.replace(/\/api\/?$/, '');
-    const es = new EventSource(`${apiBase}/api/notifications/stream?token=${token}`);
+    const es = new EventSource(`${apiBase}/api/notifications/stream`, { withCredentials: true });
 
     es.onopen = () => setIsLiveConnected(true);
     es.onmessage = (e) => {
@@ -62,7 +60,7 @@ export default function OrderTrackingPage() {
     es.onerror = () => setIsLiveConnected(false);
 
     return () => es.close();
-  }, [token, orderId]);
+  }, [orderId]);
 
   const loadOrderDetails = async () => {
     setLoading(true);

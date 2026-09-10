@@ -10,28 +10,15 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ─── Initialisation : restaurer session depuis localStorage ──
+  // ─── Initialisation : restaurer la session via le cookie HttpOnly ──
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('accessToken');
-      const savedUser = localStorage.getItem('user');
-
-      if (token) {
-        try {
-          const { data } = await usersAPI.getMe();
-          const u = data.data || data;
-          setUser(u);
-          localStorage.setItem('user', JSON.stringify(u));
-        } catch {
-          // Token serveur non vérifiable -> utiliser la session stockée si disponible
-          if (savedUser) {
-            try { setUser(JSON.parse(savedUser)); } catch { _clearSession(); }
-          } else {
-            _clearSession();
-          }
-        }
-      } else if (savedUser) {
-        try { setUser(JSON.parse(savedUser)); } catch { _clearSession(); }
+      try {
+        const { data } = await usersAPI.getMe();
+        const u = data.data || data;
+        setUser(u);
+      } catch {
+        _clearSession();
       }
       setLoading(false);
     };
@@ -86,17 +73,13 @@ export function AuthProvider({ children }) {
 
   // ─── Helpers privés ──────────────────────────────────────
   const _persistSession = (payload) => {
-    const { accessToken, refreshToken, user: u } = payload || {};
-    if (accessToken) localStorage.setItem('accessToken', accessToken);
-    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    const { user: u } = payload || {};
     if (u) localStorage.setItem('user', JSON.stringify(u));
     if (u) setUser(u);
-    return { user: u, accessToken, refreshToken };
+    return { user: u };
   };
 
   const _clearSession = () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
   };

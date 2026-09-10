@@ -46,7 +46,7 @@ const verifyOtpSchema = {
 
 const refreshSchema = {
   body: Joi.object({
-    refreshToken: Joi.string().required(),
+    refreshToken: Joi.string().optional(),
   }),
 };
 

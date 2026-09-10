@@ -8,7 +8,7 @@ const API_BASE = rawApiUrl.replace(/\/api\/?$/, "");
 const MAX_NOTIFS = 20;
 
 export function useNotifications() {
-  const { isAuthenticated, token } = useAuth();
+  const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount]     = useState(0);
   const [connected, setConnected]         = useState(false);
@@ -30,9 +30,9 @@ export function useNotifications() {
   }, []);
 
   const connect = useCallback(() => {
-    if (!isAuthenticated || !token) return;
+    if (!isAuthenticated) return;
     if (esRef.current) esRef.current.close();
-    const es = new EventSource(`${API_BASE}/api/notifications/stream?token=${token}`);
+    const es = new EventSource(`${API_BASE}/api/notifications/stream`, { withCredentials: true });
     esRef.current = es;
     es.onopen = () => { setConnected(true); retryDelay.current = 3000; };
     es.onmessage = (e) => {
@@ -48,7 +48,7 @@ export function useNotifications() {
       retryDelay.current = Math.min(delay * 2, 30000);
       setTimeout(connect, delay);
     };
-  }, [isAuthenticated, token, addNotification]);
+  }, [isAuthenticated, addNotification]);
 
   useEffect(() => {
     if (typeof Notification !== "undefined" && Notification.permission === "default") {
