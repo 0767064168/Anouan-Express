@@ -1,6 +1,6 @@
 // src/pages/admin/AdminMarketingPage.jsx — Dark Premium Orange
 import React, { useEffect, useState } from 'react';
-import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar } from 'lucide-react';
+import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar, Palette, ImagePlus, Pause, Play, Save, Package, Coins, Timer, BarChart3, Settings, BadgePercent } from 'lucide-react';
 
 const initialBanners = [
   {
@@ -216,8 +216,8 @@ export default function AdminMarketingPage() {
     <div className="space-y-8 text-slate-100">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-black text-white tracking-tight">📣 Marketing & Promotions</h1>
-        <p className="text-slate-400 text-xs mt-1">Gérez les bannières publicitaires avec produit vedette intégré et les ventes flash. 🚀</p>
+        <h1 className="flex items-center gap-2 text-2xl font-black text-white tracking-tight"><Megaphone size={22} className="text-orange-400" /> Marketing & Promotions</h1>
+        <p className="text-slate-400 text-xs mt-1">Gérez les bannières publicitaires avec produit vedette intégré et les ventes flash.</p>
       </div>
 
       {/* Bannières */}
@@ -226,20 +226,20 @@ export default function AdminMarketingPage() {
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-orange-500/20 rounded-xl"><Image size={14} className="text-orange-400"/></div>
             <div>
-              <h2 className="text-sm font-black text-white">🖼️ Bannières Publicitaires d'Accueil</h2>
-              <p className="text-[11px] text-slate-400">Chaque bannière affiche son produit vedette et filtre le catalogue au clic. 🛍️</p>
+              <h2 className="text-sm font-black text-white">Bannières Publicitaires d'Accueil</h2>
+              <p className="text-[11px] text-slate-400">Chaque bannière affiche son produit vedette et filtre le catalogue au clic.</p>
             </div>
           </div>
           <button onClick={() => setShowBannerForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">
-            <Plus size={13}/> ✨ Nouvelle bannière
+            <Plus size={13}/> Nouvelle bannière
           </button>
         </div>
 
         {showBannerForm && (
           <div className="bg-slate-900/90 border border-orange-500/30 rounded-3xl p-5 mb-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">✨ Créer une Bannière avec Produit Vedette</p>
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Créer une Bannière avec Produit Vedette</p>
               <button onClick={() => setShowBannerForm(false)} className="text-slate-500 hover:text-white">
                 <X size={16} />
               </button>
@@ -283,7 +283,7 @@ export default function AdminMarketingPage() {
             {/* Produit vedette associé */}
             <div className="p-4 bg-slate-950/60 rounded-2xl border border-slate-800/80 space-y-3">
               <p className="text-[11px] font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Tag size={13} /> 🏷️ Produit affiché dans la bannière
+                <Tag size={13} /> Produit affiché dans la bannière
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <input
@@ -317,7 +317,7 @@ export default function AdminMarketingPage() {
                   className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none"
                 />
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] text-slate-500">🖼️ Choisir un exemple :</span>
+                  <span className="text-[10px] text-slate-500">Choisir un exemple :</span>
                   {QUICK_IMAGES.map((img) => (
                     <button
                       key={img.label}
@@ -334,7 +334,7 @@ export default function AdminMarketingPage() {
             
             {/* Choix de la couleur de la bannière */}
             <div>
-              <label className="text-[11px] font-bold text-slate-400 block mb-1.5">🎨 Couleur du thème</label>
+              <label className="text-[11px] font-bold text-slate-400 block mb-1.5"><Palette size={13} className="inline-block mr-1.5 align-text-bottom" />Couleur du thème</label>
               <div className="flex flex-wrap gap-2">
                 {[
                   { label: 'Orange Solaire', color: 'from-orange-500 to-amber-500' },
@@ -358,8 +358,8 @@ export default function AdminMarketingPage() {
             </div>
 
             <div className="flex gap-2 pt-2">
-              <button onClick={addBanner} className="px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">🚀 Créer la bannière</button>
-              <button onClick={() => setShowBannerForm(false)} className="px-4 py-2.5 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">❌ Annuler</button>
+              <button onClick={addBanner} className="flex items-center gap-1.5 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><ImagePlus size={14} /> Créer la bannière</button>
+              <button onClick={() => setShowBannerForm(false)} className="px-4 py-2.5 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
             </div>
           </div>
         )}
@@ -418,7 +418,7 @@ export default function AdminMarketingPage() {
               <div className="relative z-10 pt-4">
                 <button onClick={() => toggleBanner(banner.id)}
                   className="w-full py-2 bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold rounded-xl transition-colors border border-white/20 shadow-sm">
-                  {banner.active ? '⏸️ Désactiver du site' : '▶️ Activer sur le site'}
+                  <span className="flex items-center justify-center gap-1.5">{banner.active ? <Pause size={13} /> : <Play size={13} />}{banner.active ? 'Désactiver du site' : 'Activer sur le site'}</span>
                 </button>
               </div>
             </div>
@@ -431,17 +431,17 @@ export default function AdminMarketingPage() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-red-500/20 rounded-xl"><Zap size={14} className="text-red-400"/></div>
-            <h2 className="text-sm font-black text-white">⚡ Ventes Flash</h2>
+            <h2 className="text-sm font-black text-white">Ventes Flash</h2>
           </div>
           <button onClick={() => setShowFlashForm(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-bold rounded-2xl hover:bg-red-500/20 transition-colors">
-            <Plus size={13}/> ➕ Ajouter
+            <Plus size={13}/> Ajouter
           </button>
         </div>
 
         {showFlashForm && (
           <div className="bg-slate-900/80 border border-red-500/30 rounded-3xl p-5 mb-4 space-y-3">
-            <p className="text-xs font-black text-red-400 uppercase tracking-wider">🔥 Nouveau produit en vente flash</p>
+            <p className="text-xs font-black text-red-400 uppercase tracking-wider">Nouveau produit en vente flash</p>
             <input
               value={newFlash.name}
               onChange={(e) => setNewFlash(p => ({ ...p, name: e.target.value }))}
@@ -486,8 +486,8 @@ export default function AdminMarketingPage() {
               />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={addFlash} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-2xl hover:bg-red-600 transition-colors">💾 Enregistrer</button>
-              <button onClick={() => setShowFlashForm(false)} className="px-4 py-2 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">❌ Annuler</button>
+              <button onClick={addFlash} className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-2xl hover:bg-red-600 transition-colors"><Save size={14} /> Enregistrer</button>
+              <button onClick={() => setShowFlashForm(false)} className="px-4 py-2 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
             </div>
           </div>
         )}
@@ -496,13 +496,13 @@ export default function AdminMarketingPage() {
           <table className="w-full text-xs text-left">
             <thead className="bg-slate-900/80 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-800">
               <tr>
-                <th className="px-5 py-4 font-bold">📦 Produit</th>
-                <th className="px-5 py-4 font-bold">💰 Prix original</th>
-                <th className="px-5 py-4 font-bold">🔥 Prix flash</th>
-                <th className="px-5 py-4 font-bold">🏷️ Réduction</th>
-                <th className="px-5 py-4 font-bold">⏰ Expire le</th>
-                <th className="px-5 py-4 font-bold">📊 Stock</th>
-                <th className="px-5 py-4 font-bold text-right">⚙️ Action</th>
+                <th className="px-5 py-4 font-bold"><Package size={12} className="inline-block mr-1.5" />Produit</th>
+                <th className="px-5 py-4 font-bold"><Coins size={12} className="inline-block mr-1.5" />Prix original</th>
+                <th className="px-5 py-4 font-bold"><Zap size={12} className="inline-block mr-1.5" />Prix flash</th>
+                <th className="px-5 py-4 font-bold"><BadgePercent size={12} className="inline-block mr-1.5" />Réduction</th>
+                <th className="px-5 py-4 font-bold"><Timer size={12} className="inline-block mr-1.5" />Expire le</th>
+                <th className="px-5 py-4 font-bold"><BarChart3 size={12} className="inline-block mr-1.5" />Stock</th>
+                <th className="px-5 py-4 font-bold text-right"><Settings size={12} className="inline-block mr-1.5" />Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
