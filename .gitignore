@@ -1,0 +1,18 @@
+# Local editor and workspace state
+.vs/
+.vscode/
+
+# Dependencies and generated output
+**/node_modules/
+**/dist/
+**/build/
+**/.cache/
+
+# Local environment and logs
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+
+# Mobile and tool-generated files
+mobile-builds/

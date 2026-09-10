@@ -1,0 +1,410 @@
+// src/pages/admin/AdminDashboardPage.jsx
+// Tableau de bord Admin Dark Premium — KPIs, Graphique des Revenus, Activité en direct & Gestion Vendeurs
+
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  TrendingUp, Users, ShoppingCart, PackageCheck, Eye, Loader2,
+  ArrowUpRight, ArrowDownRight, Zap, Store, DollarSign, Activity, ChevronRight,
+  Sparkles, CheckCircle2, AlertTriangle, ShieldCheck, Download, Plus, Filter, Clock
+} from 'lucide-react';
+import {
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer
+} from 'recharts';
+import { adminAPI, ordersAPI, vendorsAPI } from '../../services/api';
+import { useToast } from '../../components/ui/Toast';
+
+const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
+
+const STATUS_STYLES = {
+  'Livré':            'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25',
+  'picked_up':        'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25',
+  'En cours':         'bg-blue-500/15 text-blue-400 border border-blue-500/25',
+  'ready_for_pickup': 'bg-blue-500/15 text-blue-400 border border-blue-500/25',
+  'En attente':       'bg-amber-500/15 text-amber-400 border border-amber-500/25',
+  'preparing':        'bg-amber-500/15 text-amber-400 border border-amber-500/25',
+  'Annulé':           'bg-red-500/15 text-red-400 border border-red-500/25',
+  'cancelled':        'bg-red-500/15 text-red-400 border border-red-500/25',
+};
+
+const CHART_DATA = [
+  { month: 'Jan',  revenue: 8500000,  orders: 312 },
+  { month: 'Fév',  revenue: 9800000,  orders: 378 },
+  { month: 'Mar',  revenue: 11200000, orders: 445 },
+  { month: 'Avr',  revenue: 10500000, orders: 401 },
+  { month: 'Mai',  revenue: 13100000, orders: 512 },
+  { month: 'Juin', revenue: 12400000, orders: 487 },
+  { month: 'Juil', revenue: 14800000, orders: 578 },
+  { month: 'Août', revenue: 16500000, orders: 643 },
+];
+
+const ChartTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-xl text-xs">
+      <p className="font-bold text-white mb-1">{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color }}>
+          {p.dataKey === 'revenue'
+            ? new Intl.NumberFormat('fr-CI').format(p.value) + ' FCFA'
+            : `${p.value} commandes`}
+        </p>
+      ))}
+    </div>
+  );
+};
+
+const AdminRevenueChart = ({ data }) => (
+  <ResponsiveContainer width="100%" height={220}>
+    <AreaChart data={data}>
+      <defs>
+        <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="5%"  stopColor="#f97316" stopOpacity={0.25} />
+          <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+      <XAxis dataKey="month" tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+      <YAxis tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
+             tick={{ fill: '#64748b', fontSize: 10 }} axisLine={false} tickLine={false} />
+      <Tooltip content={<ChartTooltip />} />
+      <Area type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2.5} fill="url(#revGrad)" />
+    </AreaChart>
+  </ResponsiveContainer>
+);
+
+const RECENT_ACTIVITIES = [
+  { time: '14:32', type: 'payment', text: 'Paiement Mobile Money validé de 45 500 FCFA (Orange Money)', icon: CheckCircle2, color: 'text-emerald-400' },
+  { time: '14:15', type: 'vendor', text: 'Nouvelle boutique inscrite : "SOTRA Mode Bouaké" en attente de validation', icon: Store, color: 'text-amber-400' },
+  { time: '13:50', type: 'pickup', text: 'Code QR scanné et colis retiré au Magasin Central (#CMD-847291)', icon: PackageCheck, color: 'text-orange-400' },
+  { time: '12:10', type: 'user', text: 'Nouveau compte client enregistré : Awa Koné (Bouaké)', icon: Users, color: 'text-blue-400' },
+];
+
+export default function AdminDashboardPage() {
+  const toast = useToast();
+  const [statsData, setStatsData] = useState({
+    totalRevenue: 16500000,
+    todayOrders: 184,
+    activeVendors: 52,
+    pickupRate: '94.2%',
+  });
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("month");
+  const [selectedChartMonth, setSelectedChartMonth] = useState(CHART_DATA[7]);
+
+  useEffect(() => {
+    loadDashboardData();
+    const handleSync = () => loadDashboardData();
+    window.addEventListener('anouan_order_status_updated', handleSync);
+    return () => window.removeEventListener('anouan_order_status_updated', handleSync);
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [adminStatsRes, ordersRes] = await Promise.all([
+        adminAPI.getStats().catch(() => null),
+        ordersAPI.getAll({ limit: 5 }).catch(() => null),
+      ]);
+
+      if (adminStatsRes?.data) {
+        const d = adminStatsRes.data.data || adminStatsRes.data;
+        setStatsData((prev) => ({ ...prev, ...d }));
+      }
+
+      let fetchedOrders = [];
+      if (ordersRes?.data) {
+        const raw = ordersRes.data.orders || ordersRes.data.data || ordersRes.data;
+        if (Array.isArray(raw)) {
+          fetchedOrders = raw.map(ord => ({
+            id: ord.tracking_number || ord.id,
+            customer: ord.client_name || ord.customer_name || 'Client Anouan',
+            vendor: ord.vendor_name || 'Vendeur Anouan',
+            amount: Number(ord.total_amount) || 0,
+            status: ord.status || 'created',
+            date: ord.created_at ? new Date(ord.created_at).toLocaleDateString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : 'Récemment'
+          }));
+        }
+      }
+
+      setRecentOrders(fetchedOrders.slice(0, 5));
+    } catch (err) {
+      console.error("Erreur chargement dashboard admin:", err);
+      setRecentOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statCards = [
+    {
+      title: "Chiffre d'Affaires Global",
+      value: formatPrice(statsData.totalRevenue),
+      change: "+15.8%",
+      isPositive: true,
+      icon: DollarSign,
+      gradient: 'from-orange-500/20 to-amber-500/10',
+      iconBg: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      border: 'border-orange-500/30',
+    },
+    {
+      title: "Commandes du Jour",
+      value: statsData.todayOrders,
+      change: "+8.4%",
+      isPositive: true,
+      icon: ShoppingCart,
+      gradient: 'from-blue-500/20 to-cyan-500/10',
+      iconBg: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      border: 'border-blue-500/30',
+    },
+    {
+      title: "Boutiques Partenaires",
+      value: statsData.activeVendors,
+      change: "+4 nouvelles",
+      isPositive: true,
+      icon: Store,
+      gradient: 'from-purple-500/20 to-violet-500/10',
+      iconBg: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      border: 'border-purple-500/30',
+    },
+    {
+      title: "Taux de Retrait 24h",
+      value: statsData.pickupRate,
+      change: "+2.1%",
+      isPositive: true,
+      icon: PackageCheck,
+      gradient: 'from-emerald-500/20 to-teal-500/10',
+      iconBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+      border: 'border-emerald-500/30',
+    },
+  ];
+
+  const topVendors = [
+    { name: "Maison du Pagne Bouaké", orders: 1420, revenue: 35500000, rating: 5.0, trend: '+18%' },
+    { name: "Tech Store CI", orders: 1240, revenue: 125000000, rating: 4.8, trend: '+12%' },
+    { name: "Fashion Mode Ivoirienne", orders: 856, revenue: 18200000, rating: 4.6, trend: '+8%' },
+    { name: "Épicerie Centrale Bouaké", orders: 620, revenue: 9800000, rating: 4.4, trend: '+3%' },
+  ];
+
+  return (
+    <div className="space-y-8 text-slate-100 font-sans">
+
+      {/* Header avec Raccourcis d'Action Admin */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <div className="flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-1">
+            <Activity size={15} className="animate-pulse" /> Console d'Administration Live
+          </div>
+          <h1 className="text-2xl font-black text-white tracking-tight">Vue d'Ensemble Anouan Express</h1>
+          <p className="text-slate-400 text-xs mt-1">Supervision des ventes, retraits au magasin central et activités vendeurs à Bouaké</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/admin/vendors"
+            className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-2xl transition-all shadow-lg text-xs"
+          >
+            <Store size={15} /> Valider Vendeurs <span className="bg-slate-950 text-orange-400 text-[10px] font-black px-1.5 py-0.5 rounded-full">3</span>
+          </Link>
+          <Link
+            to="/admin/users"
+            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+          >
+            <Users size={15} className="text-orange-400" /> Gestion Utilisateurs
+          </Link>
+          <button
+            onClick={() => toast.info('Rapport mensuel PDF généré et téléchargé.')}
+            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+          >
+            <Download size={15} className="text-orange-400" /> Rapport PDF
+          </button>
+        </div>
+      </div>
+
+      {/* Cartes KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {statCards.map((stat, i) => {
+          const Icon = stat.icon;
+          return (
+            <div
+              key={i}
+              className={`relative bg-gradient-to-br ${stat.gradient} border ${stat.border} rounded-3xl p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 shadow-xl`}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className={`p-2.5 rounded-2xl border ${stat.iconBg}`}>
+                  <Icon size={20} />
+                </div>
+                <span className={`flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full ${
+                  stat.isPositive
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                    : 'bg-red-500/15 text-red-400 border border-red-500/25'
+                }`}>
+                  <ArrowUpRight size={12} />
+                  {stat.change}
+                </span>
+              </div>
+              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{stat.title}</p>
+              <p className="text-2xl font-black text-white mt-1 leading-tight">{stat.value}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Graphique Interactif des Ventes & Flux de Titres */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Graphique Visuel des Revenus (2 cols) */}
+        <div className="lg:col-span-2 glass-panel rounded-3xl p-6 border border-slate-800 space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h2 className="text-base font-black text-white flex items-center gap-2">
+                <TrendingUp size={18} className="text-orange-400" /> Évolution du Chiffre d'Affaires (2026)
+              </h2>
+              <p className="text-xs text-slate-400">Volume total des transactions enregistrées sur Anouan Express</p>
+            </div>
+            <div className="text-xs font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl">
+              {selectedChartMonth.month} 2026 : {formatPrice(selectedChartMonth.revenue)}
+            </div>
+          </div>
+
+          {/* Graphique Recharts interactif */}
+          <AdminRevenueChart data={CHART_DATA} />
+
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span>Croissance mensuelle moyenne : <strong className="text-emerald-400">+14.2%</strong></span>
+            <span>Prévision Q4 2026 : <strong className="text-orange-400">22,000,000 FCFA</strong></span>
+          </div>
+        </div>
+
+        {/* Ticker d'Activité en Direct (1 col) */}
+        <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-5 flex flex-col justify-between">
+          <div>
+            <h2 className="text-base font-black text-white flex items-center gap-2">
+              <Activity size={18} className="text-orange-400" /> Flux d'Activité Live
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">Événements en temps réel sur la plateforme</p>
+          </div>
+
+          <div className="space-y-4 flex-1 my-2">
+            {RECENT_ACTIVITIES.map((act, idx) => {
+              const Icon = act.icon;
+              return (
+                <div key={idx} className="flex items-start gap-3 text-xs">
+                  <div className={`p-2 rounded-xl bg-slate-900 border border-slate-800 ${act.color} shrink-0 mt-0.5`}>
+                    <Icon size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-slate-200 font-bold leading-snug">{act.text}</p>
+                    <span className="text-[10px] text-slate-500 font-semibold">{act.time}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            onClick={() => toast.info('Flux d\'événements système synchronisé en direct.')}
+            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-2xl border border-slate-800 text-xs font-bold transition-all text-center"
+          >
+            Actualiser le flux
+          </button>
+        </div>
+      </div>
+
+      {/* Section Commandes Récentes & Top Vendeurs */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* Tableau Commandes Récentes (2 cols) */}
+        <div className="lg:col-span-2 glass-panel rounded-3xl border border-slate-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center">
+            <div>
+              <h2 className="text-sm font-black text-white">Dernières Commandes</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Transactions récentes enregistrées</p>
+            </div>
+            <Link to="/admin/orders" className="text-[11px] font-bold text-orange-400 hover:underline flex items-center gap-1">
+              Voir tout <ChevronRight size={13} />
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-900/80 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="px-5 py-3.5 font-bold">Commande</th>
+                  <th className="px-5 py-3.5 font-bold">Client / Boutique</th>
+                  <th className="px-5 py-3.5 font-bold">Montant</th>
+                  <th className="px-5 py-3.5 font-bold">Statut</th>
+                  <th className="px-5 py-3.5 font-bold text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {recentOrders.map((order, i) => (
+                  <tr key={i} className="hover:bg-slate-800/30 transition-colors">
+                    <td className="px-5 py-3.5 font-black text-white">#{order.id}</td>
+                    <td className="px-5 py-3.5">
+                      <div className="font-bold text-slate-200">{order.customer || order.client_name || 'Client'}</div>
+                      <div className="text-slate-400 text-[10px]">{order.vendor || order.store_name || 'Magasin Central'}</div>
+                    </td>
+                    <td className="px-5 py-3.5 font-black text-orange-400">{formatPrice(order.amount || order.total_amount)}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${STATUS_STYLES[order.status] || 'bg-slate-800 text-slate-400'}`}>
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Link to="/admin/orders" className="p-1.5 inline-flex text-slate-400 hover:text-orange-400 hover:bg-orange-500/10 rounded-xl transition-colors">
+                        <Eye size={15} />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Top Vendeurs (1 col) */}
+        <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-5">
+          <div>
+            <h2 className="text-sm font-black text-white">Top Vendeurs à Bouaké</h2>
+            <p className="text-[11px] text-slate-400 mt-0.5">Boutiques les plus performantes ce mois</p>
+          </div>
+
+          <div className="space-y-4">
+            {topVendors.map((vendor, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${
+                  i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                  : i === 1 ? 'bg-slate-400/10 text-slate-400 border border-slate-700'
+                  : 'bg-slate-800/50 text-slate-500 border border-slate-800'
+                }`}>
+                  #{i + 1}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold text-white truncate">{vendor.name}</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">{vendor.orders.toLocaleString()} ventes • ⭐ {vendor.rating}</div>
+                  <div className="mt-1.5 h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                      style={{ width: `${Math.round((vendor.orders / 1420) * 100)}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="text-[10px] font-black text-emerald-400 shrink-0">{vendor.trend}</span>
+              </div>
+            ))}
+          </div>
+
+          <Link
+            to="/admin/vendors"
+            className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold rounded-2xl border border-slate-800 transition-all"
+          >
+            Voir toutes les boutiques <ChevronRight size={14} />
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}

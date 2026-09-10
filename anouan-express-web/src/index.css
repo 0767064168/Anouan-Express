@@ -1,0 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    @apply w-full overflow-x-hidden max-w-full;
+  }
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased selection:bg-orange-500 selection:text-white;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+/* Glassmorphism Ultra Premium */
+.glass-panel {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.glass-card {
+  background: rgba(30, 41, 59, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ☀️ Mode Éclairage (Light Theme) */
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+html.light .glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(203, 213, 225, 0.8);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+  color: #0f172a;
+}
+
+html.light .glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(226, 232, 240, 0.9);
+  color: #0f172a;
+}
+
+html.light .glass-card:hover {
+  background: #ffffff;
+  border-color: rgba(249, 115, 22, 0.5);
+  box-shadow: 0 12px 30px -10px rgba(249, 115, 22, 0.25);
+}
+
+.glass-card:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(249, 115, 22, 0.4);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 30px -10px rgba(249, 115, 22, 0.25);
+}
+
+/* Glow Effects */
+.glow-orange {
+  box-shadow: 0 0 30px -5px rgba(249, 115, 22, 0.35);
+}
+
+/* Gradients Orange Premium */
+.gradient-orange-hero {
+  background: linear-gradient(135deg, #7c2d12 0%, #431407 50%, #0f172a 100%);
+}
+
+.gradient-text-orange {
+  background: linear-gradient(135deg, #fb923c 0%, #f97316 50%, #ea580c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Animations */
+.pulse-badge {
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(249, 115, 22, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
+}
+
+/* 🎨 Clignotement Pagne Ivoirien (Kita / Baoulé) */
+@keyframes pagne-flash {
+  0%, 100% {
+    opacity: 0.45;
+    filter: brightness(1.0) saturate(1.2) drop-shadow(0 0 15px rgba(249, 115, 22, 0.4));
+  }
+  50% {
+    opacity: 0.85;
+    filter: brightness(1.4) saturate(1.7) drop-shadow(0 0 35px rgba(251, 191, 36, 0.8));
+  }
+}
+
+.animate-pagne-flash {
+  animation: pagne-flash 2.5s ease-in-out infinite;
+}
+
+@keyframes gold-pulse-border {
+  0%, 100% {
+    border-color: rgba(249, 115, 22, 0.4);
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.25), inset 0 0 15px rgba(249, 115, 22, 0.1);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.9);
+    box-shadow: 0 0 40px rgba(251, 191, 36, 0.6), inset 0 0 30px rgba(251, 191, 36, 0.3);
+  }
+}
+
+.border-kita-glow {
+  animation: gold-pulse-border 2.5s ease-in-out infinite;
+}
+
+/* ⚡ Animation Éclair Express du Logo */
+@keyframes lightning-sparkle {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.5)) brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(251, 191, 36, 1)) drop-shadow(0 0 22px rgba(249, 115, 22, 0.9)) brightness(1.35);
+    transform: scale(1.05);
+  }
+}
+
+.animate-lightning-sparkle {
+  animation: lightning-sparkle 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}

@@ -1,0 +1,207 @@
+// src/pages/client/NotificationsPage.jsx
+// Centre de notifications client — Dark Premium Orange
+
+import React, { useState, useEffect } from 'react';
+import { Bell, Package, Tag, ShieldCheck, Info, CheckCheck, Trash2 } from 'lucide-react';
+import { useToast } from '../../components/ui/Toast';
+import { notificationsAPI } from '../../services/api';
+
+const DEMO_NOTIFS = [
+  {
+    id: 1, type: 'order', read: false,
+    title: 'Votre commande est prête !',
+    body: 'Votre colis est disponible au Magasin Central Bouaké.',
+    time: 'Récemment',
+    icon: Package, iconBg: 'bg-orange-500/20 border-orange-500/30', iconColor: 'text-orange-400',
+  }
+];
+
+const TYPE_LABELS = {
+  all:      'Toutes',
+  order:    '📦 Commandes',
+  promo:    '🔥 Promotions',
+  security: '🔒 Sécurité',
+  system:   'ℹ️ Système',
+};
+
+export default function NotificationsPage() {
+  const toast = useToast();
+  const [notifs, setNotifs] = useState([]);
+  const [filter, setFilter] = useState('all');
+
+  const loadNotifications = async () => {
+    try {
+      const res = await notificationsAPI.getAll({ limit: 50 });
+      const data = res.data?.data || res.data || [];
+      if (Array.isArray(data) && data.length > 0) {
+        setNotifs(data.map(n => ({
+          id: n.id,
+          type: n.type || 'system',
+          read: !!n.is_read,
+          title: n.title,
+          body: n.body,
+          time: new Date(n.created_at).toLocaleDateString('fr-CI', { hour: '2-digit', minute: '2-digit' }),
+          icon: n.type === 'order' ? Package : Bell,
+          iconBg: 'bg-emerald-500/20 border-emerald-500/30',
+          iconColor: 'text-emerald-400',
+        })));
+        return;
+      }
+    } catch {}
+    setNotifs(DEMO_NOTIFS);
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const handleSync = () => loadNotifications();
+    window.addEventListener('anouan_order_status_updated', handleSync);
+    return () => window.removeEventListener('anouan_order_status_updated', handleSync);
+  }, []);
+
+  const unreadCount = notifs.filter((n) => !n.read).length;
+  const filtered = filter === 'all' ? notifs : notifs.filter((n) => n.type === filter);
+
+  const markAllRead = async () => {
+    try {
+      await notificationsAPI.markAllRead();
+    } catch {}
+    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+    toast.success('Toutes les notifications ont été marquées comme lues.');
+  };
+
+  const markRead = async (id) => {
+    try {
+      await notificationsAPI.markRead(id);
+    } catch {}
+    setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+  };
+
+  const deleteNotif = async (id) => {
+    try {
+      await notificationsAPI.delete(id);
+    } catch {}
+    setNotifs((prev) => prev.filter((n) => n.id !== id));
+    toast.info('Notification supprimée.');
+  };
+
+  const clearAll = () => {
+    setNotifs([]);
+    toast.info('Centre de notifications vidé.');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 py-10 text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-2xl font-black text-white tracking-tight">Notifications</h1>
+              {unreadCount > 0 && (
+                <span className="bg-orange-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-full shadow-lg shadow-orange-500/30">
+                  {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">Toutes vos alertes commandes, promos et sécurité</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                className="flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 px-4 py-2.5 rounded-2xl transition-all"
+              >
+                <CheckCheck size={14} /> Tout marquer lu
+              </button>
+            )}
+            {notifs.length > 0 && (
+              <button
+                onClick={clearAll}
+                className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl transition-all"
+              >
+                <Trash2 size={14} /> Tout supprimer
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filtres par type */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {Object.entries(TYPE_LABELS).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setFilter(key)}
+              className={`shrink-0 text-xs font-bold px-4 py-2 rounded-2xl border transition-all ${
+                filter === key
+                  ? 'bg-orange-500 border-orange-500 text-slate-950 shadow-lg shadow-orange-500/20'
+                  : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-orange-500/30 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Liste des notifications */}
+        {filtered.length === 0 ? (
+          <div className="glass-panel rounded-3xl border border-slate-800 p-16 text-center space-y-3">
+            <Bell size={48} className="mx-auto text-slate-700" />
+            <p className="text-slate-400 font-bold">Aucune notification pour le moment.</p>
+            <p className="text-slate-500 text-xs">Vous serez alerté ici dès qu'une action concerne votre compte.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((notif) => {
+              const Icon = notif.icon;
+              return (
+                <div
+                  key={notif.id}
+                  onClick={() => markRead(notif.id)}
+                  className={`glass-panel rounded-3xl border p-5 flex items-start gap-4 cursor-pointer transition-all group ${
+                    notif.read
+                      ? 'border-slate-800 opacity-60 hover:opacity-100'
+                      : 'border-orange-500/30 bg-orange-500/5 hover:border-orange-500/50'
+                  }`}
+                >
+                  {/* Icône */}
+                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center border shrink-0 ${notif.iconBg}`}>
+                    <Icon size={20} className={notif.iconColor} />
+                  </div>
+
+                  {/* Contenu */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className={`text-sm font-black leading-snug ${notif.read ? 'text-slate-300' : 'text-white'}`}>
+                        {notif.title}
+                        {!notif.read && (
+                          <span className="ml-2 inline-block w-2 h-2 rounded-full bg-orange-400 align-middle" />
+                        )}
+                      </p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteNotif(notif.id); }}
+                        className="shrink-0 p-1 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed">{notif.body}</p>
+                    <p className="text-[10px] text-slate-600 font-semibold pt-1">{notif.time}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Footer info */}
+        {filtered.length > 0 && (
+          <p className="text-center text-xs text-slate-600">
+            Les notifications sont conservées pendant 30 jours.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

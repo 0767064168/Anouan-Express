@@ -1,0 +1,18 @@
+{
+  "short_name": "AnouanEx",
+  "name": "Anouan Express - Marketplace & Retrait Bouake",
+  "description": "Plateforme marketplace et retrait securise par code unique au magasin central de Bouake.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#020617",
+  "theme_color": "#f97316",
+  "display": "standalone",
+  "orientation": "portrait"
+}
