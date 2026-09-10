@@ -1,5 +1,5 @@
 // src/pages/admin/AdminMarketingPage.jsx — Dark Premium Orange
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar } from 'lucide-react';
 
 const initialBanners = [
