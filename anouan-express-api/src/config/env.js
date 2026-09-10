@@ -9,10 +9,20 @@ const required = (key) => {
 };
 
 const optional = (key, defaultVal = '') => process.env[key] || defaultVal;
+const appEnv = optional('NODE_ENV', 'development');
+const jwtSecret = optional('JWT_SECRET', 'dev_only_change_me_32_characters_minimum');
+const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'dev_only_refresh_change_me_32_chars');
+
+if (appEnv === 'production') {
+  const invalidSecret = (value) => value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme');
+  if (invalidSecret(jwtSecret) || invalidSecret(jwtRefreshSecret)) {
+    throw new Error('JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes en production.');
+  }
+}
 
 module.exports = {
   app: {
-    env: optional('NODE_ENV', 'development'),
+    env: appEnv,
     port: parseInt(optional('PORT', '5000'), 10),
     name: optional('APP_NAME', 'Anouan Express API'),
     url: optional('APP_URL', 'http://localhost:5000'),
@@ -29,9 +39,9 @@ module.exports = {
   },
 
   jwt: {
-    secret: optional('JWT_SECRET', 'changeme_secret_32_chars_minimum!!'),
+    secret: jwtSecret,
     accessExpiresIn: optional('JWT_ACCESS_EXPIRES_IN', '15m'),
-    refreshSecret: optional('JWT_REFRESH_SECRET', 'changeme_refresh_secret!!'),
+    refreshSecret: jwtRefreshSecret,
     refreshExpiresIn: optional('JWT_REFRESH_EXPIRES_IN', '7d'),
   },
 

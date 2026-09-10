@@ -69,22 +69,7 @@ const register = async ({ name, email, phone, password, role = 'client', shopNam
 
     return { user, ...tokens };
   } catch (err) {
-    if (err.isOperational) throw err;
-    const userRole = role === 'vendor' ? 'vendor' : 'client';
-    // Fallback Mock Standalone si PostgreSQL n'est pas connecté
-    const mockUser = {
-      id: 'usr_' + Date.now(),
-      name: shopName || name || (userRole === 'vendor' ? 'Boutique Vendeur' : 'Utilisateur Anouan'),
-      email: email || (userRole === 'vendor' ? 'vendeur@anouanexpress.ci' : 'user@anouanexpress.ci'),
-      phone: phone || '+225 07 00 00 00 00',
-      role: userRole,
-      vendorId: userRole === 'vendor' ? 'v_' + Date.now() : undefined,
-      shop_name: shopName || undefined,
-      status: 'active',
-      created_at: new Date().toISOString()
-    };
-    const tokens = generateTokens(mockUser.id, mockUser.role);
-    return { user: mockUser, ...tokens };
+    throw err;
   }
 };
 
@@ -96,53 +81,13 @@ const loginWithPassword = async ({ email, password }) => {
       'SELECT id, name, email, phone, password_hash, role, status, avatar_url FROM users WHERE email = $1',
       [email]
     );
-    if (!result.rows.length) {
-      const e = (email || '').toLowerCase();
-      if (e.includes('admin') || e.includes('vendor') || e.includes('vendeur') || e.includes('agent')) {
-        let role = 'client';
-        if (e.includes('admin')) role = 'admin';
-        else if (e.includes('vendor') || e.includes('vendeur')) role = 'vendor';
-        else if (e.includes('agent')) role = 'agent';
-
-        const demoUser = {
-          id: 'usr_demo_' + role,
-          name: email.split('@')[0].toUpperCase(),
-          email,
-          phone: '+225 07 00 00 00 00',
-          role,
-          status: 'active',
-        };
-        const tokens = generateTokens(demoUser.id, demoUser.role);
-        return { user: demoUser, ...tokens };
-      }
-      throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
-    }
+    if (!result.rows.length) throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
 
     const user = result.rows[0];
     if (user.status === 'banned') throw new AppError('Compte suspendu.', 403, 'ACCOUNT_BANNED');
 
     const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      const e = (email || '').toLowerCase();
-      if (e.includes('admin') || e.includes('vendor') || e.includes('vendeur') || e.includes('agent')) {
-        let role = 'client';
-        if (e.includes('admin')) role = 'admin';
-        else if (e.includes('vendor') || e.includes('vendeur')) role = 'vendor';
-        else if (e.includes('agent')) role = 'agent';
-
-        const demoUser = {
-          id: 'usr_demo_' + role,
-          name: email.split('@')[0].toUpperCase(),
-          email,
-          phone: '+225 07 00 00 00 00',
-          role,
-          status: 'active',
-        };
-        const tokens = generateTokens(demoUser.id, demoUser.role);
-        return { user: demoUser, ...tokens };
-      }
-      throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
-    }
+    if (!valid) throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
 
     const tokens = generateTokens(user.id, user.role);
     await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
@@ -150,23 +95,7 @@ const loginWithPassword = async ({ email, password }) => {
     const { password_hash, ...safeUser } = user;
     return { user: safeUser, ...tokens };
   } catch (err) {
-    if (err.isOperational) throw err;
-    // Fallback Mock Standalone pour la démo si DB éteinte
-    let role = 'client';
-    if (email.includes('admin')) role = 'admin';
-    else if (email.includes('vendor')) role = 'vendor';
-    else if (email.includes('agent')) role = 'agent';
-
-    const mockUser = {
-      id: 'usr_demo',
-      name: email.split('@')[0].toUpperCase(),
-      email,
-      phone: '+225 07 00 00 00 00',
-      role,
-      status: 'active',
-    };
-    const tokens = generateTokens(mockUser.id, mockUser.role);
-    return { user: mockUser, ...tokens };
+    throw err;
   }
 };
 

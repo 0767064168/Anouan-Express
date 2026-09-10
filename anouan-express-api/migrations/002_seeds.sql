@@ -3,18 +3,6 @@
 -- Données initiales : admin, catégories, magasin de Bouaké
 -- ============================================================
 
--- ⚠️ Mot de passe admin par défaut : "Admin@2026!" — à changer immédiatement
--- Hash bcrypt de "Admin@2026!" avec saltRounds=12
-INSERT INTO users (name, email, phone, password_hash, role, status)
-VALUES (
-  'Administrateur',
-  'admin@anouanexpress.ci',
-  '+22500000000',
-  '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TiGX6.7Y/f5ZQlH9y0GxVYwnsMuK',
-  'admin',
-  'active'
-) ON CONFLICT (email) DO NOTHING;
-
 -- ============================================================
 -- Catégories principales
 -- ============================================================

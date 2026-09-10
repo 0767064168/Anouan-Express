@@ -132,11 +132,9 @@ src/
 
 ---
 
-## Compte admin par défaut
+## Compte administrateur
 
-> **Email** : `admin@anouanexpress.ci`  
-> **Mot de passe** : `Admin@2026!`  
-> ⚠️ **À changer immédiatement après le premier déploiement**
+Le compte administrateur est créé par `npm run db:setup` à partir de `ADMIN_EMAIL` et `ADMIN_PASSWORD` dans `.env`. Aucun mot de passe administrateur n'est inclus dans le dépôt.
 
 ---
 

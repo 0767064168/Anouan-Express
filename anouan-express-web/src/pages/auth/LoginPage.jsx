@@ -148,44 +148,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Accès Démo Rapide par Rôle */}
-            <div className="mb-6 space-y-2">
-              <span className="text-[10px] font-bold text-orange-400 uppercase tracking-widest block text-center">
-                ✨ Connexion Rapide Démo 1-Clic
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { role: 'Admin', email: 'admin@anouanexpress.ci', pathRole: 'admin', icon: '👑' },
-                  { role: 'Vendeur', email: 'vendeur@anouanexpress.ci', pathRole: 'vendor', icon: '🏬' },
-                  { role: 'Agent', email: 'agent@anouanexpress.ci', pathRole: 'agent', icon: '📦' },
-                  { role: 'Client', email: 'client@anouanexpress.ci', pathRole: 'client', icon: '🛒' },
-                ].map((d) => (
-                  <button
-                    key={d.role}
-                    type="button"
-                    onClick={async () => {
-                      setForm({ email: d.email, password: 'password123', phone: '', otp: '' });
-                      setLoading(true);
-                      try {
-                        const data = await login({ email: d.email, password: 'password123' });
-                        toast.success(`Session ${d.role} activée !`);
-                        navigate(getRoleRedirect(d.pathRole), { replace: true });
-                      } finally {
-                        setLoading(false);
-                      }
-                    }}
-                    className="p-2.5 bg-slate-950 border border-slate-800 hover:border-orange-500/50 hover:bg-slate-850 rounded-2xl text-left transition-all flex items-center gap-2 group"
-                  >
-                    <span className="text-base">{d.icon}</span>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-white group-hover:text-orange-400 transition-colors">{d.role}</p>
-                      <p className="text-[9px] text-slate-400 truncate">{d.email}</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* ── Formulaire Email/Mot de passe ── */}
             {mode === 'password' && (
               <form onSubmit={handlePasswordLogin} className="space-y-4">

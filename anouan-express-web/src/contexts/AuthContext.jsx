@@ -38,41 +38,12 @@ export function AuthProvider({ children }) {
     initAuth();
   }, []);
 
-  // ─── Connexion email/mot de passe avec Secours DÉMO Fluide ─
+  // ─── Connexion email/mot de passe ─────────────────────────
   const login = useCallback(async ({ email, password }) => {
-    const e = (email || '').toLowerCase();
-    let expectedRole = 'client';
-    if (e.includes('admin')) expectedRole = 'admin';
-    else if (e.includes('vendor') || e.includes('vendeur')) expectedRole = 'vendor';
-    else if (e.includes('agent')) expectedRole = 'agent';
-
-    try {
-      const { data: envelope } = await authAPI.loginPassword({ email, password });
-      const payload = envelope?.data || envelope;
-      if (payload && payload.user) {
-        if (expectedRole !== 'client' && payload.user.role === 'client') {
-          payload.user.role = expectedRole;
-        }
-        return _persistSession(payload);
-      }
-    } catch {
-      // Secours démo si l'API backend renvoie une erreur
-    }
-
-    const demoUser = {
-      id: 'usr_' + expectedRole + '_' + Date.now(),
-      name: email ? email.split('@')[0].toUpperCase() : expectedRole.toUpperCase(),
-      email: email || `${expectedRole}@anouanexpress.ci`,
-      phone: '+225 07 00 00 00 00',
-      role: expectedRole,
-      status: 'active',
-    };
-    const mockPayload = {
-      user: demoUser,
-      accessToken: 'mock_access_token_' + Date.now(),
-      refreshToken: 'mock_refresh_token_' + Date.now(),
-    };
-    return _persistSession(mockPayload);
+    const { data: envelope } = await authAPI.loginPassword({ email, password });
+    const payload = envelope?.data || envelope;
+    if (!payload?.user) throw new Error('Réponse de connexion invalide.');
+    return _persistSession(payload);
   }, []);
 
   // ─── Connexion OTP (téléphone) ────────────────────────────
@@ -82,19 +53,7 @@ export function AuthProvider({ children }) {
       const payload = envelope?.data || envelope;
       return _persistSession(payload);
     } catch (err) {
-      const demoUser = {
-        id: 'usr_otp_' + Date.now(),
-        name: 'Client SMS',
-        email: 'client@anouanexpress.ci',
-        phone: phone,
-        role: 'client',
-        status: 'active',
-      };
-      return _persistSession({
-        user: demoUser,
-        accessToken: 'mock_access_token_' + Date.now(),
-        refreshToken: 'mock_refresh_token_' + Date.now(),
-      });
+      throw err;
     }
   }, []);
 
@@ -105,23 +64,7 @@ export function AuthProvider({ children }) {
       const payload = envelope?.data || envelope;
       return _persistSession(payload);
     } catch (err) {
-      const userRole = userData.role || 'client';
-      const demoUser = {
-        id: 'usr_' + Date.now(),
-        name: userData.shopName || userData.name || (userRole === 'vendor' ? 'Boutique Vendeur' : 'Nouveau Client'),
-        email: userData.email || (userRole === 'vendor' ? 'vendeur@anouanexpress.ci' : 'client@anouanexpress.ci'),
-        phone: userData.phone || '+225 07 00 00 00 00',
-        role: userRole,
-        vendorId: userRole === 'vendor' ? 'v_' + Date.now() : undefined,
-        shop_name: userData.shopName || undefined,
-        store_location: userData.storeLocation || 'Bouaké',
-        status: 'active',
-      };
-      return _persistSession({
-        user: demoUser,
-        accessToken: 'mock_access_token_' + Date.now(),
-        refreshToken: 'mock_refresh_token_' + Date.now(),
-      });
+      throw err;
     }
   }, []);
 
