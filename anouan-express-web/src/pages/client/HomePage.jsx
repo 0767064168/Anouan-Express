@@ -80,7 +80,7 @@ const HomePage = () => {
   }, [contextProducts]);
 
   useEffect(() => {
-    setFlashProducts(loadActiveFlashProducts());
+    loadActiveFlashProducts();
     if (contextProducts.length > 0) {
       setFeaturedProducts(contextProducts);
     }
@@ -89,7 +89,7 @@ const HomePage = () => {
   // Écoute les mises à jour des ventes flash de l'Admin en temps réel
   useEffect(() => {
     const handleFlashUpdate = () => {
-      setFlashProducts(loadActiveFlashProducts());
+      loadActiveFlashProducts();
     };
     window.addEventListener('storage', handleFlashUpdate);
     window.addEventListener('anouan_flash_sales_updated', handleFlashUpdate);
