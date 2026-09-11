@@ -27,10 +27,15 @@ const paymentRefSchema = Joi.object({
   paymentRef: Joi.string().required()
 });
 
+const rejectPayoutSchema = Joi.object({
+  reason: Joi.string().max(500).allow('').optional()
+});
+
 module.exports = {
   createPayoutSchema,
   requestVendorPayoutSchema,
   dateRangeSchema,
   payoutIdParamSchema,
-  paymentRefSchema
+  paymentRefSchema,
+  rejectPayoutSchema
 };

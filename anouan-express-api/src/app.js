@@ -62,7 +62,7 @@ app.use(helmet({
 app.use(cors({
   origin: (origin, callback) => {
     // Autorise les appels sans origin (mobile apps, Postman)
-    if (!origin || env.cors.origins.includes(origin)) {
+    if (!origin || env.cors.origins.includes(origin) || origin === 'capacitor://localhost' || origin === 'http://localhost') {
       callback(null, true);
     } else {
       callback(new Error(`CORS: Origine non autorisée — ${origin}`));
@@ -70,7 +70,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
 }));
 
 // ─── Parsers ──────────────────────────────────────────────────

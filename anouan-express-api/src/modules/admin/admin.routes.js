@@ -23,6 +23,9 @@ router.put('/banners/:id', validate({ body: updateBannerSchema }), adminControll
 router.delete('/banners/:id', adminController.deleteBanner);
 router.patch('/banners/:id/toggle', adminController.toggleBannerActive);
 
+// Stats
+router.get('/stats', adminController.getStats);
+
 // Flash Sales
 router.get('/flash-sales', adminController.getFlashSales);
 router.post('/flash-sales', validate({ body: createFlashSaleSchema }), adminController.createFlashSale);

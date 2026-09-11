@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Package, Clock, Truck, MapPin, CheckCircle, Download, Users, X, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Sparkles, MessageSquare, Store } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { ordersAPI, pickupAPI } from '../../services/api';
+import { API_BASE_URL, ordersAPI, pickupAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import InvoiceModal from '../../components/client/InvoiceModal';
@@ -44,8 +44,7 @@ export default function OrderTrackingPage() {
 
   // Écoute SSE en temps réel pour la commande
   useEffect(() => {
-    const rawApiUrl = import.meta.env.VITE_API_URL || '/api';
-    const apiBase = rawApiUrl.replace(/\/api\/?$/, '');
+    const apiBase = API_BASE_URL.replace(/\/api\/?$/, '');
     const es = new EventSource(`${apiBase}/api/notifications/stream`, { withCredentials: true });
 
     es.onopen = () => setIsLiveConnected(true);

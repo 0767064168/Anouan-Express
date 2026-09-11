@@ -79,16 +79,9 @@ const DEFAULT_AGENTS = [
   },
 ];
 
-const DEMO_PAYOUTS = [
-  { id: 'PAY-501', vendor: 'Tech Store CI',    amount: 1250000, status: 'paid',    date: '27/08/2026', method: 'orange', phone: '+225 07 00 11 22' },
-  { id: 'PAY-500', vendor: 'Fashion Mode',      amount:  320000, status: 'pending', date: '26/08/2026', method: 'wave',   phone: '+225 07 88 99 00' },
-  { id: 'PAY-499', vendor: 'Beautique Plus',       amount:  185000, status: 'paid',    date: '25/08/2026', method: 'mtn',    phone: '+225 05 44 55 66' },
-  { id: 'PAY-498', vendor: 'Épicerie Centrale', amount:   95000, status: 'pending', date: '24/08/2026', method: 'orange', phone: '+225 05 66 77 88' },
-];
-
 export default function AdminFinancePage() {
   const [activeTab, setActiveTab]           = useState('versements');
-  const [stats, setStats]                   = useState({ totalRevenue: 14250000, totalCommission: 1567500, pendingPayouts: 415000, paidPayouts: 1435000 });
+  const [stats, setStats]                   = useState({ totalRevenue: 0, totalCommission: 0, pendingPayouts: 0, paidPayouts: 0 });
   const [payouts, setPayouts]               = useState([]);
   const [loading, setLoading]               = useState(true);
   const [loadError, setLoadError]           = useState('');
@@ -123,13 +116,13 @@ export default function AdminFinancePage() {
         const mapped = list.map(p => ({
           id: p.id,
           vendor: p.vendor_name || p.shop_name || 'Vendeur Anouan',
-          amount: Number(p.amount) || 0,
+          amount: Number(p.amount_due ?? p.amount ?? 0),
           fee: Number(p.platform_fee || 0),
-          net: Number(p.net_amount || p.amount || 0),
-          method: p.payment_method || 'wave',
-          phone: p.phone_number || p.phone || '—',
+          net: Number(p.net_amount ?? p.amount_due ?? p.amount ?? 0),
+          method: p.payout_method || p.payment_method || 'wave',
+          phone: p.payout_phone || p.phone_number || p.phone || '—',
           date: p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR') : 'Récemment',
-          status: p.status || 'pending',
+          status: p.status === 'failed' ? 'rejected' : (p.status || 'pending'),
         }));
         setPayouts(mapped);
       } else {
@@ -152,7 +145,9 @@ export default function AdminFinancePage() {
   const handleUpdateStatus = async (payoutId, newStatus) => {
     try {
       if (newStatus === 'paid') {
-        await financeAPI.markPayoutPaid(payoutId, { payment_reference: `PAY-${Date.now()}` }).catch(() => null);
+        await financeAPI.markPayoutPaid(payoutId, { paymentRef: `PAY-${Date.now()}` });
+      } else {
+        await financeAPI.rejectPayout(payoutId, { reason: 'Rejeté depuis l’espace administration' });
       }
       setPayouts(prev => prev.map(p => p.id === payoutId ? { ...p, status: newStatus } : p));
       window.dispatchEvent(new Event('anouan_payout_updated'));

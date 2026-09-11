@@ -2,9 +2,9 @@
 // Hook React pour les notifications push via Server-Sent Events (SSE)
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { API_BASE_URL } from "../services/api";
 
-const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-const API_BASE = rawApiUrl.replace(/\/api\/?$/, "");
+const API_BASE = API_BASE_URL.replace(/\/api\/?$/, "");
 const MAX_NOTIFS = 20;
 
 export function useNotifications() {

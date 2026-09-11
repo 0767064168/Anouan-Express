@@ -95,4 +95,19 @@ describe('auth.service password reset', () => {
       })
     ).rejects.toMatchObject({ code: 'RESET_TOKEN_EXPIRED' });
   });
+
+  it('rejects OTP login for banned accounts', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        id: 'user-1',
+        status: 'banned',
+        otp_code: '123456',
+        otp_expires_at: new Date(Date.now() + 60_000),
+      }],
+    });
+
+    await expect(
+      authService.verifyOTP({ phone: '+2250700000000', otp: '123456' })
+    ).rejects.toMatchObject({ code: 'ACCOUNT_BANNED' });
+  });
 });

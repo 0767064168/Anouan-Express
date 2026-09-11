@@ -1,7 +1,7 @@
 // src/pages/auth/LoginPage.jsx
 // Page de connexion — email/mot de passe + OTP par téléphone avec Logo Animé & Toast
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Phone, Eye, EyeOff, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const [form, setForm] = useState({
     email: '',
@@ -33,6 +34,14 @@ export default function LoginPage() {
 
   const set = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setResendCooldown((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
 
   const getRoleRedirect = (role) => {
     const r = (role || '').toLowerCase();
@@ -67,6 +76,7 @@ export default function LoginPage() {
     try {
       await authAPI.sendOTP({ phone: form.phone });
       setStep(2);
+      setResendCooldown(60);
       toast.info('Code SMS envoyé avec succès.');
     } catch (err) {
       const msg = err.response?.data?.message || 'Impossible d\'envoyer le code SMS.';
@@ -88,6 +98,24 @@ export default function LoginPage() {
       navigate(getRoleRedirect(role), { replace: true });
     } catch (err) {
       const msg = err.response?.data?.message || 'Code OTP invalide ou expiré.';
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0 || loading) return;
+    setError('');
+    setLoading(true);
+    try {
+      await authAPI.sendOTP({ phone: form.phone });
+      setResendCooldown(60);
+      setForm((current) => ({ ...current, otp: '' }));
+      toast.info('Nouveau code SMS envoyé.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Impossible de renvoyer le code SMS.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -133,7 +161,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setMode('otp'); setStep(1); setError(''); }}
+            onClick={() => { setMode('otp'); setStep(1); setError(''); setResendCooldown(0); }}
             className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
               mode === 'otp'
                 ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
@@ -246,7 +274,7 @@ export default function LoginPage() {
                     inputMode="numeric"
                     maxLength={6}
                     value={form.otp}
-                    onChange={set('otp')}
+                    onChange={(event) => setForm((current) => ({ ...current, otp: event.target.value.replace(/\D/g, '').slice(0, 6) }))}
                     required
                     placeholder="123456"
                     className="w-full text-center text-2xl font-mono font-bold tracking-[0.3em] py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white focus:border-orange-500 outline-none transition-all"
@@ -257,6 +285,14 @@ export default function LoginPage() {
                     Valider <ArrowRight className="w-5 h-5" />
                   </>
                 </AuthPrimaryButton>
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={loading || resendCooldown > 0}
+                  className="w-full text-xs font-semibold text-orange-400 hover:text-orange-300 py-2 transition-colors disabled:text-slate-600 disabled:cursor-not-allowed"
+                >
+                  {resendCooldown > 0 ? `Renvoyer le code dans ${resendCooldown}s` : 'Renvoyer le code SMS'}
+                </button>
                 <button
                   type="button"
                   onClick={() => { setStep(1); setForm(f => ({ ...f, otp: '' })); }}

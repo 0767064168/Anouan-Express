@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar, Palette, ImagePlus, Pause, Play, Save, Package, Coins, Timer, BarChart3, Settings, BadgePercent } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
+import { adminAPI } from '../../services/api';
 
 const initialBanners = [
   {
@@ -99,10 +100,10 @@ export default function AdminMarketingPage() {
           category: 'mode',
         })));
       } else {
-        setBanners(initialBanners);
+        setBanners([]);
       }
-    } catch {
-      setBanners(initialBanners);
+    } catch (error) {
+      setBanners([]);
     }
 
     try {
@@ -117,8 +118,12 @@ export default function AdminMarketingPage() {
           endsAt: f.ends_at,
           stock: 10,
         })));
+      } else {
+        setFlashSales([]);
       }
-    } catch {}
+    } catch (error) {
+      setFlashSales([]);
+    }
     setLoading(false);
   };
 
@@ -149,24 +154,34 @@ export default function AdminMarketingPage() {
   });
 
   const toggleBanner = async (id) => {
-    setBanners(prev => prev.map(b => b.id === id ? { ...b, active: !b.active } : b));
-    window.dispatchEvent(new Event('anouan_banners_updated'));
+    try {
+      const response = await adminAPI.toggleBanner(id);
+      const banner = response.data?.data || response.data;
+      setBanners(prev => prev.map(b => b.id === id ? { ...b, active: banner?.is_active !== false } : b));
+      window.dispatchEvent(new Event('anouan_banners_updated'));
+    } catch (error) {
+      console.error('Erreur activation bannière:', error);
+    }
   };
 
   const deleteBanner = async (id) => {
     try {
       await adminAPI.deleteBanner(id);
-    } catch {}
-    setBanners(prev => prev.filter(b => b.id !== id));
-    window.dispatchEvent(new Event('anouan_banners_updated'));
+      setBanners(prev => prev.filter(b => b.id !== id));
+      window.dispatchEvent(new Event('anouan_banners_updated'));
+    } catch (error) {
+      console.error('Erreur suppression bannière:', error);
+    }
   };
 
   const deleteFlash = async (id) => {
     try {
       await adminAPI.deleteFlashSale(id);
-    } catch {}
-    setFlashSales(prev => prev.filter(f => f.id !== id));
-    window.dispatchEvent(new Event('anouan_flash_sales_updated'));
+      setFlashSales(prev => prev.filter(f => f.id !== id));
+      window.dispatchEvent(new Event('anouan_flash_sales_updated'));
+    } catch (error) {
+      console.error('Erreur suppression flash sale:', error);
+    }
   };
 
   const addFlash = () => {

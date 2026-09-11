@@ -72,6 +72,16 @@ async function runSetup() {
       console.log('✅ Schéma appliqué avec succès !');
     }
 
+    await client.query(`
+      ALTER TABLE users
+        ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10),
+        ADD COLUMN IF NOT EXISTS otp_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS reset_token_expires_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS refresh_token TEXT;
+    `);
+    console.log('✅ Colonnes utilisateur de sécurité vérifiées.');
+
     if (fs.existsSync(seedsPath)) {
       console.log('🌱 Exécution des données de test (002_seeds.sql)...');
       const seedsSql = fs.readFileSync(seedsPath, 'utf8');
@@ -94,6 +104,14 @@ async function runSetup() {
       const sql003 = fs.readFileSync(migration003Path, 'utf8');
       await client.query(sql003);
       console.log('✅ Migration 003 appliquée avec succès !');
+    }
+
+    const migration004Path = path.join(__dirname, '../migrations/004_add_payout_destination.sql');
+    if (fs.existsSync(migration004Path)) {
+      console.log('💸 Application de la migration de destination de paiement (004_add_payout_destination.sql)...');
+      const sql004 = fs.readFileSync(migration004Path, 'utf8');
+      await client.query(sql004);
+      console.log('✅ Migration 004 appliquée avec succès !');
     }
 
     client.release();

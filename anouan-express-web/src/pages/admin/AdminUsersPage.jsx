@@ -2,21 +2,10 @@
 // Gestion des comptes Clients — Dark Premium Orange
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Filter, UserCheck, UserX, ShieldAlert, RefreshCw } from 'lucide-react';
+import { Users, Search, Filter, UserCheck, UserX, ShieldAlert, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import PageHeader from '../../components/ui/PageHeader';
 import { usersAPI } from '../../services/api';
-
-const DEMO_USERS = [
-  { id: 1, name: 'Kouadio Jean-Marc', email: 'jm.kouadio@gmail.com', phone: '+225 07 45 12 88', role: 'client', status: 'active', orders: 12, joined: '12 jan 2026' },
-  { id: 2, name: 'Awa Koné Diallo', email: 'awa.kone@yahoo.fr', phone: '+225 05 89 33 21', role: 'client', status: 'active', orders: 7, joined: '03 fév 2026' },
-  { id: 3, name: 'Bamba Souleymane', email: 'bamba.s@hotmail.com', phone: '+225 01 65 44 09', role: 'client', status: 'active', orders: 3, joined: '18 mar 2026' },
-  { id: 4, name: 'Fatou Traoré', email: 'fatou.t@gmail.com', phone: '+225 07 12 00 77', role: 'client', status: 'banned', orders: 0, joined: '02 avr 2026' },
-  { id: 5, name: 'Yao Koffi Armand', email: 'yao.armand@ci.ci', phone: '+225 05 30 87 44', role: 'vendor', status: 'active', orders: 0, joined: '15 avr 2026' },
-  { id: 6, name: 'Adjoua Marguerite', email: 'adjoua.m@orange.ci', phone: '+225 07 99 56 12', role: 'client', status: 'active', orders: 21, joined: '01 mai 2026' },
-  { id: 7, name: 'Koné Ibrahim Agent', email: 'kone.agent@anouan.ci', phone: '+225 01 22 98 55', role: 'agent', status: 'active', orders: 0, joined: '10 mai 2026' },
-  { id: 8, name: 'Gbagbo Serge Vendeur', email: 'gbagbo.s@vendor.ci', phone: '+225 05 44 17 30', role: 'vendor', status: 'active', orders: 0, joined: '22 mai 2026' },
-];
 
 const ROLE_BADGE = {
   admin:  { label: 'Admin',  classes: 'bg-red-500/10 border border-red-500/30 text-red-400' },
@@ -39,17 +28,24 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const res = await usersAPI.getAll({ limit: 100 });
+      const res = await usersAPI.getAll({ page, limit: 20 });
       const data = res.data?.data || res.data || [];
+      const pagination = res.data?.pagination;
       setUsers(Array.isArray(data) ? data.map((user) => ({
         ...user,
+        name: user.name || 'Utilisateur sans nom',
+        email: user.email || '',
+        phone: user.phone || '',
         orders: user.orders || 0,
         joined: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-CI') : '—',
       })) : []);
+      setTotalPages(Math.max(1, pagination?.totalPages || 1));
     } catch (err) {
       setUsers([]);
       toast.error('Impossible de charger les utilisateurs.');
@@ -60,10 +56,14 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [page]);
 
   const filtered = users.filter((u) => {
-    const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search);
+    const normalizedSearch = search.toLowerCase();
+    const matchSearch = !normalizedSearch
+      || u.name.toLowerCase().includes(normalizedSearch)
+      || u.email.toLowerCase().includes(normalizedSearch)
+      || u.phone.includes(search);
     const matchRole = roleFilter === 'all' || u.role === roleFilter;
     const matchStatus = statusFilter === 'all' || u.status === statusFilter;
     return matchSearch && matchRole && matchStatus;
@@ -74,10 +74,13 @@ export default function AdminUsersPage() {
 
   const handleBan = async (userId) => {
     const u = users.find((x) => x.id === userId);
+    if (!u) return;
     const nextStatus = u.status === 'banned' ? 'active' : 'banned';
+    const actionLabel = nextStatus === 'active' ? 'réactiver' : 'suspendre';
+    if (!window.confirm(`Voulez-vous vraiment ${actionLabel} le compte de ${u.name} ?`)) return;
     try {
       await usersAPI.updateStatus(userId, nextStatus);
-      setUsers((prev) => prev.map((user) => user.id === userId ? { ...user, status: nextStatus } : user));
+      await loadUsers();
       toast.success(`Compte de ${u.name} ${nextStatus === 'active' ? 'réactivé' : 'suspendu'}.`);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Impossible de modifier le statut du compte.');
@@ -251,9 +254,19 @@ export default function AdminUsersPage() {
         <div className="border-t border-slate-800 px-5 py-3 flex items-center justify-between text-xs text-slate-400">
           <span>{filtered.length} utilisateur{filtered.length > 1 ? 's' : ''} affiché{filtered.length > 1 ? 's' : ''}</span>
           <div className="flex items-center gap-2">
-            <button className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><ChevronLeft size={16} /></button>
-            <span className="px-3 py-1 bg-orange-500 text-slate-950 font-black rounded-lg">1</span>
-            <button className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"><ChevronRight size={16} /></button>
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Page précédente"
+            ><ChevronLeft size={16} /></button>
+            <span className="px-3 py-1 bg-orange-500 text-slate-950 font-black rounded-lg">{page} / {totalPages}</span>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page >= totalPages}
+              className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Page suivante"
+            ><ChevronRight size={16} /></button>
           </div>
         </div>
       </div>

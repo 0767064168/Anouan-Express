@@ -46,7 +46,7 @@ const getUser = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
   try {
-    const user = await userService.updateUserStatus(req.params.id, req.body.status);
+    const user = await userService.updateUserStatus(req.params.id, req.body.status, req.user.id);
     res.json({ success: true, data: user });
   } catch (err) {
     next(err);

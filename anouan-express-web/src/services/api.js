@@ -3,7 +3,7 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -168,8 +168,10 @@ export const financeAPI = {
   getVendorPayouts: (params) => api.get('/finance/vendor/payouts', { params }),
   getAdminStats: (params) => api.get('/finance/admin/stats', { params }),
   getAllPayouts: (params) => api.get('/finance/admin/payouts', { params }),
+  exportOrders: (params) => api.get('/finance/admin/export', { params, responseType: 'blob' }),
   createPayout: (data) => api.post('/finance/admin/payouts', data),
   markPayoutPaid: (id, data) => api.put(`/finance/admin/payouts/${id}/paid`, data),
+  rejectPayout: (id, data) => api.put(`/finance/admin/payouts/${id}/rejected`, data),
   requestPayout: (data) => api.post('/finance/vendor/payout', data),
 };
 
@@ -186,11 +188,13 @@ export const adminAPI = {
   createBanner: (data) => api.post('/admin/banners', data),
   updateBanner: (id, data) => api.put(`/admin/banners/${id}`, data),
   deleteBanner: (id) => api.delete(`/admin/banners/${id}`),
+  toggleBanner: (id) => api.patch(`/admin/banners/${id}/toggle`),
   getFlashSales: () => api.get('/admin/flash-sales'),
   getPublicFlashSales: () => api.get('/admin/public/flash-sales'),
   createFlashSale: (data) => api.post('/admin/flash-sales', data),
   updateFlashSale: (id, data) => api.put(`/admin/flash-sales/${id}`, data),
   deleteFlashSale: (id) => api.delete(`/admin/flash-sales/${id}`),
+  getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
   getSettings: () => api.get('/admin/settings'),
   updateSetting: (key, data) => api.put(`/admin/settings/${key}`, data),
 };

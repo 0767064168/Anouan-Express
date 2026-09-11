@@ -15,6 +15,18 @@ const updateMyProfile = async (userId, { name, phone, email, avatarUrl }) => {
   const values = [];
   let index = 1;
 
+  if (email !== undefined) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const duplicate = await query(
+      'SELECT id FROM users WHERE LOWER(email) = $1 AND id <> $2 LIMIT 1',
+      [normalizedEmail, userId]
+    );
+    if (duplicate.rows.length) {
+      throw new AppError('Cette adresse email est déjà utilisée.', 409, 'EMAIL_ALREADY_EXISTS');
+    }
+    email = normalizedEmail;
+  }
+
   if (name !== undefined) {
     fields.push(`name = $${index++}`);
     values.push(name);
@@ -92,7 +104,10 @@ const getUserById = async (userId) => {
   return result.rows[0];
 };
 
-const updateUserStatus = async (userId, status) => {
+const updateUserStatus = async (userId, status, actorId) => {
+  if (String(userId) === String(actorId)) {
+    throw new AppError('Vous ne pouvez pas modifier le statut de votre propre compte.', 400, 'SELF_STATUS_CHANGE');
+  }
   const result = await query(
     'UPDATE users SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, email, phone, role, status',
     [status, userId]

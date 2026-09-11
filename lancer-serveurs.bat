@@ -19,8 +19,9 @@ echo ========================================================
 echo   TOUT EST LANCE ET SYNCHRONISE !
 echo.
 echo  - Acces PC (Web) : http://localhost:3000
-echo  - Acces Mobile   : Application AnouanExpress sur telephone
-echo                     ou navigateur sur http://192.168.11.40:3000
+echo  - Acces Web Telephone : http://192.168.11.40:3000
+echo  - Test API Telephone  : http://192.168.11.40:5000/health
+echo  - APK Android         : utiliser l'application installee
 echo.
 echo  * Si l'APK n'arrive pas a joindre le PC, faites un clic droit
 echo    sur "debloquer-firewall.bat" -> "Executer en tant qu'administrateur".

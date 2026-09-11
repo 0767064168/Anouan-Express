@@ -1,6 +1,6 @@
 // src/pages/admin/AdminOrdersPage.jsx — Dark Premium Orange
 import React, { useState, useEffect, useMemo } from 'react';
-import { RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2 } from 'lucide-react';
+import { RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ordersAPI, disputesAPI } from '../../services/api';
 import DataToolbar from '../../components/ui/DataToolbar';
 import PageHeader from '../../components/ui/PageHeader';
@@ -56,19 +56,22 @@ export default function AdminOrdersPage() {
   const [disputeAction, setDisputeAction] = useState('refund_client');
   const [adminNote, setAdminNote]         = useState('');
   const [submitting, setSubmitting]       = useState(false);
+  const [page, setPage]                   = useState(1);
+  const [totalPages, setTotalPages]       = useState(1);
 
   useEffect(() => {
     loadOrders();
     const handleUpdate = () => loadOrders();
     window.addEventListener('anouan_order_status_updated', handleUpdate);
     return () => window.removeEventListener('anouan_order_status_updated', handleUpdate);
-  }, []);
+  }, [page, statusFilter, search]);
 
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const res = await ordersAPI.getAll({ limit: 100 });
+      const res = await ordersAPI.getAll({ page, limit: 20, status: statusFilter || undefined, search: search.trim() || undefined });
       const data = res.data?.data || res.data || [];
+      setTotalPages(Math.max(1, res.data?.pagination?.totalPages || 1));
       const orderList = Array.isArray(data) ? data : [];
       setOrders(orderList.map(o => ({
         ...o,
@@ -119,6 +122,11 @@ export default function AdminOrdersPage() {
     });
   }, [orders, search, statusFilter]);
 
+  const changeStatusFilter = (value) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
   return (
     <div className="space-y-6 text-slate-100">
       <PageHeader
@@ -133,18 +141,18 @@ export default function AdminOrdersPage() {
         )}
       />
 
-      <DataToolbar
+          <DataToolbar
         searchValue={search}
-        onSearchChange={setSearch}
+        onSearchChange={(value) => { setSearch(value); setPage(1); }}
         searchPlaceholder="Rechercher par ID commande, nom client, téléphone, boutique..."
         hasActiveFilters={Boolean(statusFilter || search)}
-        onReset={() => { setStatusFilter(''); setSearch(''); }}
+        onReset={() => { setStatusFilter(''); setSearch(''); setPage(1); }}
       >
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-slate-500" />
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => changeStatusFilter(e.target.value)}
             className="bg-slate-950 border border-slate-800 text-xs text-white rounded-2xl px-4 py-2.5 outline-none focus:border-orange-500 cursor-pointer"
           >
             {STATUS_FILTERS.map((s) => (
@@ -164,7 +172,7 @@ export default function AdminOrdersPage() {
             return (
               <button
                 key={s.id || 'all'}
-                onClick={() => setStatusFilter(s.id)}
+                onClick={() => changeStatusFilter(s.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap flex items-center gap-1.5 shrink-0 ${
                   isSelected
                     ? 'bg-orange-500 text-white shadow-md shadow-orange-500/20'
@@ -197,7 +205,7 @@ export default function AdminOrdersPage() {
             </p>
             {(statusFilter || search) && (
               <button
-                onClick={() => { setStatusFilter(''); setSearch(''); }}
+                onClick={() => { setStatusFilter(''); setSearch(''); setPage(1); }}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-orange-500/15 border border-orange-500/30 text-orange-400 font-bold rounded-xl hover:bg-orange-500/25 transition-colors"
               >
                 <X size={13} /> Effacer les filtres
@@ -245,7 +253,7 @@ export default function AdminOrdersPage() {
                       <td className="px-5 py-4 font-black text-orange-400">{formatPrice(order.total_amount)}</td>
                       <td className="px-5 py-4">
                         <button
-                          onClick={() => setStatusFilter(normalizeStatus(order.status))}
+                          onClick={() => changeStatusFilter(normalizeStatus(order.status))}
                           title={`Filtrer par « ${st.label} »`}
                           className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-transform hover:scale-105 cursor-pointer ${st.cls}`}
                         >
@@ -273,6 +281,24 @@ export default function AdminOrdersPage() {
             </table>
           </div>
         )}
+        <div className="border-t border-slate-800 px-5 py-3 flex items-center justify-between text-xs text-slate-400">
+          <span>{filtered.length} commande{filtered.length > 1 ? 's' : ''} sur cette page</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={page === 1}
+              className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Page précédente"
+            ><ChevronLeft size={16} /></button>
+            <span className="px-3 py-1 bg-orange-500 text-slate-950 font-black rounded-lg">{page} / {totalPages}</span>
+            <button
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={page >= totalPages}
+              className="p-1.5 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Page suivante"
+            ><ChevronRight size={16} /></button>
+          </div>
+        </div>
       </div>
 
       {/* Modal Détail */}

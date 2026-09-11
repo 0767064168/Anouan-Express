@@ -12,7 +12,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from 'recharts';
-import { adminAPI, ordersAPI, vendorsAPI } from '../../services/api';
+import { adminAPI, financeAPI, ordersAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
@@ -29,17 +29,6 @@ const STATUS_STYLES = {
   'Annulé':           'bg-red-500/15 text-red-400 border border-red-500/25',
   'cancelled':        'bg-red-500/15 text-red-400 border border-red-500/25',
 };
-
-const CHART_DATA = [
-  { month: 'Jan',  revenue: 8500000,  orders: 312 },
-  { month: 'Fév',  revenue: 9800000,  orders: 378 },
-  { month: 'Mar',  revenue: 11200000, orders: 445 },
-  { month: 'Avr',  revenue: 10500000, orders: 401 },
-  { month: 'Mai',  revenue: 13100000, orders: 512 },
-  { month: 'Juin', revenue: 12400000, orders: 487 },
-  { month: 'Juil', revenue: 14800000, orders: 578 },
-  { month: 'Août', revenue: 16500000, orders: 643 },
-];
 
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -76,25 +65,21 @@ const AdminRevenueChart = ({ data }) => (
   </ResponsiveContainer>
 );
 
-const RECENT_ACTIVITIES = [
-  { time: '14:32', type: 'payment', text: 'Paiement Mobile Money validé de 45 500 FCFA (Orange Money)', icon: CheckCircle2, color: 'text-emerald-400' },
-  { time: '14:15', type: 'vendor', text: 'Nouvelle boutique inscrite : "SOTRA Mode Bouaké" en attente de validation', icon: Store, color: 'text-amber-400' },
-  { time: '13:50', type: 'pickup', text: 'Code QR scanné et colis retiré au Magasin Central (#CMD-847291)', icon: PackageCheck, color: 'text-orange-400' },
-  { time: '12:10', type: 'user', text: 'Nouveau compte client enregistré : Awa Koné (Bouaké)', icon: Users, color: 'text-blue-400' },
-];
-
 export default function AdminDashboardPage() {
   const toast = useToast();
   const [statsData, setStatsData] = useState({
-    totalRevenue: 16500000,
-    todayOrders: 184,
-    activeVendors: 52,
-    pickupRate: '94.2%',
+    totalRevenue: 0,
+    todayOrders: 0,
+    activeVendors: 0,
+    pickupRate: '0.0%',
   });
   const [recentOrders, setRecentOrders] = useState([]);
+  const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("month");
-  const [selectedChartMonth, setSelectedChartMonth] = useState(CHART_DATA[7]);
+  const chartData = statsData.revenueByMonth || [];
+  const selectedChartMonth = chartData[chartData.length - 1] || null;
+  const topVendors = statsData.topVendors || [];
 
   useEffect(() => {
     loadDashboardData();
@@ -110,6 +95,7 @@ export default function AdminDashboardPage() {
         adminAPI.getStats().catch(() => null),
         ordersAPI.getAll({ limit: 5 }).catch(() => null),
       ]);
+      const auditRes = await adminAPI.getAuditLogs({ limit: 5 }).catch(() => null);
 
       if (adminStatsRes?.data) {
         const d = adminStatsRes.data.data || adminStatsRes.data;
@@ -132,6 +118,14 @@ export default function AdminDashboardPage() {
       }
 
       setRecentOrders(fetchedOrders.slice(0, 5));
+
+      const auditLogs = auditRes?.data?.data || auditRes?.data || [];
+      setRecentActivities(Array.isArray(auditLogs) ? auditLogs.map((log) => ({
+        time: log.created_at ? new Date(log.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '—',
+        text: `${log.user_name || 'Système'} : ${log.action}`,
+        icon: log.action?.includes('payout') ? DollarSign : log.action?.includes('vendor') ? Store : Activity,
+        color: log.action?.includes('payout') ? 'text-emerald-400' : log.action?.includes('vendor') ? 'text-amber-400' : 'text-blue-400',
+      })) : []);
     } catch (err) {
       console.error("Erreur chargement dashboard admin:", err);
       setRecentOrders([]);
@@ -140,11 +134,25 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const response = await financeAPI.exportOrders();
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'anouan-express-commandes.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Export des commandes téléchargé.');
+    } catch (err) {
+      toast.error('Impossible de générer l’export des commandes.');
+    }
+  };
+
   const statCards = [
     {
-      title: "Chiffre d'Affaires Global",
+      title: "Chiffre d'Affaires du jour",
       value: formatPrice(statsData.totalRevenue),
-      change: "+15.8%",
       isPositive: true,
       icon: DollarSign,
       gradient: 'from-orange-500/20 to-amber-500/10',
@@ -154,7 +162,6 @@ export default function AdminDashboardPage() {
     {
       title: "Commandes du Jour",
       value: statsData.todayOrders,
-      change: "+8.4%",
       isPositive: true,
       icon: ShoppingCart,
       gradient: 'from-blue-500/20 to-cyan-500/10',
@@ -164,7 +171,6 @@ export default function AdminDashboardPage() {
     {
       title: "Boutiques Partenaires",
       value: statsData.activeVendors,
-      change: "+4 nouvelles",
       isPositive: true,
       icon: Store,
       gradient: 'from-purple-500/20 to-violet-500/10',
@@ -174,20 +180,12 @@ export default function AdminDashboardPage() {
     {
       title: "Taux de Retrait 24h",
       value: statsData.pickupRate,
-      change: "+2.1%",
       isPositive: true,
       icon: PackageCheck,
       gradient: 'from-emerald-500/20 to-teal-500/10',
       iconBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       border: 'border-emerald-500/30',
     },
-  ];
-
-  const topVendors = [
-    { name: "Maison du Pagne Bouaké", orders: 1420, revenue: 35500000, rating: 5.0, trend: '+18%' },
-    { name: "Tech Store CI", orders: 1240, revenue: 125000000, rating: 4.8, trend: '+12%' },
-    { name: "Fashion Mode Ivoirienne", orders: 856, revenue: 18200000, rating: 4.6, trend: '+8%' },
-    { name: "Épicerie Centrale Bouaké", orders: 620, revenue: 9800000, rating: 4.4, trend: '+3%' },
   ];
 
   return (
@@ -213,10 +211,10 @@ export default function AdminDashboardPage() {
               <Users size={15} className="text-orange-400" /> Gestion Utilisateurs
             </Link>
             <button
-              onClick={() => toast.info('Rapport mensuel PDF généré et téléchargé.')}
+              onClick={handleExport}
               className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
             >
-              <Download size={15} className="text-orange-400" /> Rapport PDF
+              <Download size={15} className="text-orange-400" /> Exporter CSV
             </button>
           </>
         }
@@ -251,16 +249,22 @@ export default function AdminDashboardPage() {
               <p className="text-xs text-slate-400">Volume total des transactions enregistrées sur Anouan Express</p>
             </div>
             <div className="text-xs font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl">
-              {selectedChartMonth.month} 2026 : {formatPrice(selectedChartMonth.revenue)}
+              {selectedChartMonth ? `${selectedChartMonth.month} 2026 : ${formatPrice(selectedChartMonth.revenue)}` : 'Aucune donnée historique'}
             </div>
           </div>
 
           {/* Graphique Recharts interactif */}
-          <AdminRevenueChart data={CHART_DATA} />
+          {chartData.length > 0 ? (
+            <AdminRevenueChart data={chartData} />
+          ) : (
+            <div className="h-[220px] flex items-center justify-center rounded-2xl border border-dashed border-slate-800 text-xs text-slate-500">
+              L’historique mensuel sera disponible après synchronisation des données.
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>Croissance mensuelle moyenne : <strong className="text-emerald-400">+14.2%</strong></span>
-            <span>Prévision Q4 2026 : <strong className="text-orange-400">22,000,000 FCFA</strong></span>
+            <span>La croissance sera calculée sur les données réelles.</span>
+            <span>Prévisions indisponibles</span>
           </div>
         </div>
 
@@ -274,7 +278,7 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="space-y-4 flex-1 my-2">
-            {RECENT_ACTIVITIES.map((act, idx) => {
+            {recentActivities.length > 0 ? recentActivities.map((act, idx) => {
               const Icon = act.icon;
               return (
                 <div key={idx} className="flex items-start gap-3 text-xs">
@@ -287,7 +291,11 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               );
-            })}
+            }) : (
+              <div className="h-full min-h-32 flex items-center justify-center rounded-2xl border border-dashed border-slate-800 text-xs text-slate-500 text-center px-4">
+                Aucun événement récent à afficher.
+              </div>
+            )}
           </div>
 
           <button
@@ -359,7 +367,11 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="space-y-4">
-            {topVendors.map((vendor, i) => (
+            {topVendors.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                Les performances vendeurs seront disponibles après synchronisation.
+              </div>
+            ) : topVendors.map((vendor, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${
                   i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'

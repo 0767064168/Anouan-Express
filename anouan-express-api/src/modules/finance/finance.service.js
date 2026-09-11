@@ -213,6 +213,32 @@ const markPayoutPaid = async (adminId, payoutId, { paymentRef }) => {
   return payout;
 };
 
+const rejectPayout = async (adminId, payoutId, { reason = '' }) => {
+  const check = await query('SELECT status FROM vendor_payouts WHERE id = $1', [payoutId]);
+  if (!check.rows.length) throw new AppError('Payout not found', 404);
+  if (check.rows[0].status !== 'pending') {
+    throw new AppError('Only pending payouts can be rejected', 400);
+  }
+
+  const res = await query(
+    `UPDATE vendor_payouts
+     SET status = 'failed', notes = $1
+     WHERE id = $2
+     RETURNING *`,
+    [reason || 'Reversement rejeté par un administrateur', payoutId]
+  );
+
+  const payout = res.rows[0];
+  await logAudit({
+    action: 'finance.payout_rejected',
+    entityType: 'vendor_payout',
+    entityId: payoutId,
+    metadata: { reason },
+    userId: adminId,
+  });
+  return payout;
+};
+
 const getAdminStats = async (filters) => {
   let dateFilter = '';
   const params = [];
@@ -228,8 +254,8 @@ const getAdminStats = async (filters) => {
     FROM orders ${dateFilter}
   `;
 
-  const clientsQuery = `SELECT COUNT(DISTINCT user_id) FROM orders ${dateFilter}`;
-  const vendorsQuery = `SELECT COUNT(*) FROM vendors WHERE status = 'approved'`;
+  const clientsQuery = `SELECT COUNT(DISTINCT client_id) FROM orders ${dateFilter}`;
+  const vendorsQuery = `SELECT COUNT(*) FROM vendors WHERE validation_status = 'approved'`;
 
   const topVendorsQuery = `
     SELECT u.name, SUM(oi.unit_price * oi.quantity) AS revenue
@@ -267,37 +293,51 @@ const getAdminStats = async (filters) => {
     ORDER BY month ASC
   `;
 
-  const [totalsRes, clientsRes, vendorsRes, topVendors, topProducts, statusRes, monthlyRes] = await Promise.all([
+  const payoutSummaryQuery = `
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_due ELSE 0 END), 0) AS pending_payouts,
+      COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_paid ELSE 0 END), 0) AS paid_payouts
+    FROM vendor_payouts
+  `;
+
+  const [totalsRes, clientsRes, vendorsRes, topVendors, topProducts, statusRes, monthlyRes, payoutSummaryRes] = await Promise.all([
     query(totalsQuery, params),
     query(clientsQuery, params),
     query(vendorsQuery),
     query(topVendorsQuery),
     query(topProductsQuery),
     query(statusQuery),
-    query(monthlyRevenueQuery)
+    query(monthlyRevenueQuery),
+    query(payoutSummaryQuery)
   ]);
 
-  const total_orders = parseInt(totalsRes.rows[0].total_orders, 10);
-  const total_revenue = parseInt(totalsRes.rows[0].total_revenue, 10);
-  const total_clients = parseInt(clientsRes.rows[0].count, 10);
-  const total_vendors = parseInt(vendorsRes.rows[0].count, 10);
-  const avg_basket = total_orders > 0 ? Math.floor(total_revenue / total_orders) : 0;
+  const totalOrders = parseInt(totalsRes.rows[0].total_orders, 10);
+  const totalRevenue = parseInt(totalsRes.rows[0].total_revenue, 10);
+  const totalClients = parseInt(clientsRes.rows[0].count, 10);
+  const totalVendors = parseInt(vendorsRes.rows[0].count, 10);
+  const avgBasket = totalOrders > 0 ? Math.floor(totalRevenue / totalOrders) : 0;
+  const totalCommission = Math.floor(totalRevenue * 0.1);
+  const pendingPayouts = Number(payoutSummaryRes.rows[0]?.pending_payouts || 0);
+  const paidPayouts = Number(payoutSummaryRes.rows[0]?.paid_payouts || 0);
 
-  const orders_by_status = statusRes.rows.reduce((acc, row) => {
+  const ordersByStatus = statusRes.rows.reduce((acc, row) => {
     acc[row.status] = parseInt(row.count, 10);
     return acc;
   }, {});
 
   return {
-    total_revenue,
-    total_orders,
-    total_clients,
-    total_vendors,
-    avg_basket,
-    top_vendors: topVendors.rows,
-    top_products: topProducts.rows,
-    orders_by_status,
-    revenue_by_month: monthlyRes.rows
+    totalRevenue,
+    totalOrders,
+    totalClients,
+    totalVendors,
+    avgBasket,
+    totalCommission,
+    pendingPayouts,
+    paidPayouts,
+    topVendors: topVendors.rows,
+    topProducts: topProducts.rows,
+    ordersByStatus,
+    revenueByMonth: monthlyRes.rows
   };
 };
 
@@ -315,13 +355,13 @@ const exportOrdersCSV = async (filters) => {
     SELECT 
       o.id as order_id, o.created_at, o.status, o.total_amount,
       c.name as client_name, c.email as client_email,
-      u.name as vendor_name, p.title as product_title,
+      v.shop_name as vendor_name, COALESCE(oi.title, p.title) as product_title,
       oi.quantity, oi.unit_price
     FROM orders o
-    JOIN users c ON o.user_id = c.id
+    JOIN users c ON o.client_id = c.id
     JOIN order_items oi ON o.id = oi.order_id
-    JOIN products p ON oi.product_id = p.id
-    JOIN users u ON oi.vendor_id = u.id
+    LEFT JOIN products p ON oi.product_id = p.id
+    JOIN vendors v ON oi.vendor_id = v.id
     ${whereStr}
     ORDER BY o.created_at DESC
   `;
@@ -354,6 +394,7 @@ module.exports = {
   getAllPayouts,
   createPayout,
   markPayoutPaid,
+  rejectPayout,
   getAdminStats,
   exportOrdersCSV
 };

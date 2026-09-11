@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:mobile": "vite build --mode mobile && cap sync android",
+    "build:device": "vite build --mode device && cap sync android",
     "preview": "vite preview"
   },
   "dependencies": {

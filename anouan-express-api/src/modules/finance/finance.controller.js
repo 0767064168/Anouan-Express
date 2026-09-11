@@ -70,6 +70,15 @@ const markPayoutPaid = async (req, res, next) => {
   }
 };
 
+const rejectPayout = async (req, res, next) => {
+  try {
+    const data = await financeService.rejectPayout(req.user.id, req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getAdminStats = async (req, res, next) => {
   try {
     const { dateFrom, dateTo } = req.query;
@@ -103,6 +112,7 @@ module.exports = {
   getAllPayouts,
   createPayout,
   markPayoutPaid,
+  rejectPayout,
   getAdminStats,
   exportOrdersCSV
 };

@@ -1,31 +1,90 @@
 // src/pages/admin/AdminContentPage.jsx — Dark Premium Orange
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Plus, Trash2, Edit, Eye, ToggleLeft, ToggleRight, Package } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
-
-const DEMO_CONTENT = [
-  { id: 'C-1', type: 'Bannière Hero',    title: 'Bienvenue sur Anouan Express', visible: true,  updatedAt: '28/08/2026' },
-  { id: 'C-2', type: 'Section Promo',    title: 'Offres Spéciales de la semaine', visible: true,  updatedAt: '27/08/2026' },
-  { id: 'C-3', type: 'Catégories vedettes', title: 'Tech, Mode, Beauté',         visible: false, updatedAt: '25/08/2026' },
-  { id: 'C-4', type: 'Footer',           title: 'Liens & Mentions légales',       visible: true,  updatedAt: '20/08/2026' },
-];
-
-const DEMO_PRODUCTS = [
-  { id: 'P-101', name: 'iPhone 15 Pro Max', category: 'Téléphones', price: 850000, featured: true,  stock: 8  },
-  { id: 'P-102', name: 'Nike Air Max 270',  category: 'Chaussures',  price:  95000, featured: false, stock: 24 },
-  { id: 'P-103', name: 'Crème Nivea Gold',  category: 'Beauté',      price:   8500, featured: true,  stock: 60 },
-];
+import { adminAPI } from '../../services/api';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
 export default function AdminContentPage() {
-  const [contents,  setContents]  = useState(DEMO_CONTENT);
-  const [products,  setProducts]  = useState(DEMO_PRODUCTS);
+  const [contents, setContents] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('contenu');
+  const [actionError, setActionError] = useState('');
 
-  const toggleVisible  = (id) => setContents((p)  => p.map((c) => c.id === id ? { ...c, visible: !c.visible } : c));
-  const toggleFeatured = (id) => setProducts((p)  => p.map((c) => c.id === id ? { ...c, featured: !c.featured } : c));
-  const deleteContent  = (id) => setContents((p)  => p.filter((c) => c.id !== id));
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const bannersRes = await adminAPI.getBanners();
+        const banners = bannersRes.data?.data || bannersRes.data || [];
+        setContents(Array.isArray(banners)
+          ? banners.map((b) => ({
+              id: b.id,
+              type: 'Bannière Hero',
+              title: b.title,
+              visible: b.is_active !== false,
+              updatedAt: b.updated_at ? new Date(b.updated_at).toLocaleDateString('fr-CI') : 'Aujourd’hui',
+            }))
+          : []);
+      } catch {
+        setContents([]);
+      }
+
+      try {
+        const flashRes = await adminAPI.getFlashSales();
+        const flashList = flashRes.data?.data || flashRes.data || [];
+        setProducts(Array.isArray(flashList)
+          ? flashList.map((f) => ({
+              id: f.id,
+              name: f.product_title || 'Produit flash',
+              category: 'Promotions',
+              price: Number(f.flash_price || 0),
+              featured: true,
+              stock: 10,
+            }))
+          : []);
+      } catch {
+        setProducts([]);
+      }
+
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
+
+  const toggleVisible = async (id) => {
+    setActionError('');
+    try {
+      const response = await adminAPI.toggleBanner(id);
+      const banner = response.data?.data || response.data;
+      setContents((previous) => previous.map((content) => content.id === id
+        ? { ...content, visible: banner?.is_active !== false, updatedAt: banner?.updated_at ? new Date(banner.updated_at).toLocaleDateString('fr-CI') : content.updatedAt }
+        : content));
+    } catch (error) {
+      setActionError(error.response?.data?.message || 'Impossible de modifier la visibilité de cette bannière.');
+    }
+  };
+  const removeFeatured = async (id) => {
+    setActionError('');
+    try {
+      await adminAPI.deleteFlashSale(id);
+      setProducts((previous) => previous.filter((product) => product.id !== id));
+    } catch (error) {
+      setActionError(error.response?.data?.message || 'Impossible de retirer cette promotion.');
+    }
+  };
+  const deleteContent = async (id) => {
+    setActionError('');
+    try {
+      await adminAPI.deleteBanner(id);
+      setContents((previous) => previous.filter((content) => content.id !== id));
+    } catch (error) {
+      setActionError(error.response?.data?.message || 'Impossible de supprimer cette bannière.');
+    }
+  };
 
   const tabs = [
     { key: 'contenu',  label: 'Contenu & Pages' },
@@ -46,6 +105,12 @@ export default function AdminContentPage() {
         )}
       />
 
+      {actionError && (
+        <div className="px-4 py-3 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-bold">
+          {actionError}
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1.5 bg-slate-900/60 border border-slate-800 p-1.5 rounded-2xl w-fit">
         {tabs.map((t) => (
@@ -65,8 +130,15 @@ export default function AdminContentPage() {
             <Image size={14} className="text-orange-400"/>
             <h2 className="text-sm font-black text-white">Sections de Contenu</h2>
           </div>
+          {loading ? (
+            <div className="p-6 text-xs text-slate-400">Chargement des contenus…</div>
+          ) : (
           <div className="divide-y divide-slate-800/60">
-            {contents.map((c) => (
+            {contents.length === 0 ? (
+              <div className="px-6 py-10 text-center text-xs text-slate-500">
+                Aucun contenu réel n’est disponible pour le moment.
+              </div>
+            ) : contents.map((c) => (
               <div key={c.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/20 transition-colors">
                 <div className={`p-2 rounded-xl border ${c.visible ? 'bg-orange-500/15 border-orange-500/25 text-orange-400' : 'bg-slate-800 border-slate-700 text-slate-500'}`}>
                   <Image size={14}/>
@@ -95,6 +167,7 @@ export default function AdminContentPage() {
               </div>
             ))}
           </div>
+          )}
         </div>
       )}
 
@@ -118,20 +191,22 @@ export default function AdminContentPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {products.map((p) => (
+                {products.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-10 text-center text-xs text-slate-500">
+                      Aucun produit mis en avant n’est disponible pour le moment.
+                    </td>
+                  </tr>
+                ) : products.map((p) => (
                   <tr key={p.id} className="hover:bg-slate-800/30 transition-colors">
                     <td className="px-5 py-4 font-bold text-white">{p.name}</td>
                     <td className="px-5 py-4 text-slate-400">{p.category}</td>
                     <td className="px-5 py-4 font-black text-orange-400">{formatPrice(p.price)}</td>
                     <td className="px-5 py-4 text-slate-300">{p.stock} unités</td>
                     <td className="px-5 py-4">
-                      <button onClick={() => toggleFeatured(p.id)}
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border transition-all ${
-                          p.featured
-                            ? 'bg-orange-500/15 text-orange-400 border-orange-500/25'
-                            : 'bg-slate-800 text-slate-500 border-slate-700 hover:border-orange-500/25 hover:text-orange-400'
-                        }`}>
-                        {p.featured ? '★ Mis en avant' : '☆ Non mis en avant'}
+                      <button onClick={() => removeFeatured(p.id)}
+                        className="px-2.5 py-1 rounded-full text-[10px] font-bold border bg-orange-500/15 text-orange-400 border-orange-500/25 hover:bg-red-500/15 hover:text-red-400 hover:border-red-500/25 transition-all">
+                        Retirer de la une
                       </button>
                     </td>
                     <td className="px-5 py-4 text-right">

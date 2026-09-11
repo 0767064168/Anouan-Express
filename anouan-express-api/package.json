@@ -8,8 +8,8 @@
     "start": "node src/app.js",
     "test": "jest --runInBand",
     "db:setup": "node scripts/setup-db.js",
-    "migrate": "psql -U %DB_USER% -d %DB_NAME% -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql",
-    "migrate:unix": "psql -U $DB_USER -d $DB_NAME -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql"
+    "migrate": "psql -U %DB_USER% -d %DB_NAME% -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql",
+    "migrate:unix": "psql -U $DB_USER -d $DB_NAME -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql"
   },
   "keywords": [
     "ecommerce",

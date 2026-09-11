@@ -108,6 +108,82 @@ const deleteFlashSale = async (id) => {
   return true;
 };
 
+const getDashboardStats = async () => {
+  const [todayRes, vendorsRes, totalOrdersRes, pickedUpRes, monthlyRes, topVendorsRes] = await Promise.all([
+    query(`
+      SELECT
+        COUNT(*)::int AS today_orders,
+        COALESCE(SUM(total_amount), 0)::numeric AS total_revenue
+      FROM orders
+      WHERE created_at >= CURRENT_DATE
+    `),
+    query(`
+      SELECT COUNT(*)::int AS active_vendors
+      FROM vendors
+      WHERE validation_status = 'approved'
+    `),
+    query(`
+      SELECT COUNT(*)::int AS total_orders
+      FROM orders
+    `),
+    query(`
+      SELECT COUNT(*)::int AS picked_up_orders
+      FROM orders
+      WHERE status = 'picked_up'
+    `),
+    query(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
+        COALESCE(SUM(total_amount), 0)::numeric AS revenue,
+        COUNT(*)::int AS orders
+      FROM orders
+      WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) - INTERVAL '5 months'
+      GROUP BY DATE_TRUNC('month', created_at)
+      ORDER BY DATE_TRUNC('month', created_at) ASC
+    `),
+    query(`
+      SELECT
+        v.shop_name,
+        COUNT(DISTINCT oi.order_id)::int AS orders,
+        COALESCE(SUM(oi.unit_price * oi.quantity), 0)::numeric AS revenue,
+        COALESCE(v.avg_rating, 0)::numeric AS rating
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      JOIN vendors v ON v.id = oi.vendor_id
+      WHERE o.status = 'picked_up'
+        AND o.created_at >= DATE_TRUNC('month', CURRENT_DATE)
+      GROUP BY v.id, v.shop_name, v.avg_rating
+      ORDER BY revenue DESC
+      LIMIT 5
+    `)
+  ]);
+
+  const todayOrders = parseInt(todayRes.rows[0]?.today_orders || '0', 10);
+  const totalRevenue = Number(todayRes.rows[0]?.total_revenue || 0);
+  const activeVendors = parseInt(vendorsRes.rows[0]?.active_vendors || '0', 10);
+  const totalOrders = parseInt(totalOrdersRes.rows[0]?.total_orders || '0', 10);
+  const pickedUpOrders = parseInt(pickedUpRes.rows[0]?.picked_up_orders || '0', 10);
+  const pickupRate = totalOrders > 0 ? `${((pickedUpOrders / totalOrders) * 100).toFixed(1)}%` : '0.0%';
+
+  return {
+    totalRevenue,
+    todayOrders,
+    activeVendors,
+    pickupRate,
+    revenueByMonth: monthlyRes.rows.map((row) => ({
+      month: row.month,
+      revenue: Number(row.revenue || 0),
+      orders: Number(row.orders || 0),
+    })),
+    topVendors: topVendorsRes.rows.map((row) => ({
+      name: row.shop_name,
+      orders: Number(row.orders || 0),
+      revenue: Number(row.revenue || 0),
+      rating: Number(row.rating || 0),
+    })),
+  };
+};
+
 const getPlatformSettings = async () => {
   const res = await query('SELECT key, value FROM platform_settings');
   const settings = {};
@@ -208,6 +284,7 @@ module.exports = {
   getFlashSales,
   createFlashSale,
   deleteFlashSale,
+  getDashboardStats,
   getPlatformSettings,
   updateSetting,
   getUserRoles,

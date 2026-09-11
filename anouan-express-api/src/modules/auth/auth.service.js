@@ -128,6 +128,7 @@ const verifyOTP = async ({ phone, otp }) => {
   if (!result.rows.length) throw new AppError('Numéro introuvable.', 404, 'PHONE_NOT_FOUND');
 
   const user = result.rows[0];
+  if (user.status === 'banned') throw new AppError('Compte suspendu.', 403, 'ACCOUNT_BANNED');
   if (user.otp_code !== otp) throw new AppError('Code OTP invalide.', 401, 'INVALID_OTP');
   if (new Date() > new Date(user.otp_expires_at)) throw new AppError('Code OTP expiré.', 401, 'OTP_EXPIRED');
 

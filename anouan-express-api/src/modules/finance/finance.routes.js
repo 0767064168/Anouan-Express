@@ -5,7 +5,7 @@ const { authenticate } = require('../../middlewares/authenticate');
 const { authorize } = require('../../middlewares/authorize');
 const { validate } = require('../../middlewares/validate');
 const { logAudit } = require('../../middlewares/auditLog');
-const { createPayoutSchema, requestVendorPayoutSchema, dateRangeSchema, payoutIdParamSchema, paymentRefSchema } = require('./finance.validation');
+const { createPayoutSchema, requestVendorPayoutSchema, dateRangeSchema, payoutIdParamSchema, paymentRefSchema, rejectPayoutSchema } = require('./finance.validation');
 
 // Vendor routes
 router.get('/vendor/stats', authenticate, authorize('vendor'), validate({ query: dateRangeSchema }), financeController.getVendorStats);
@@ -17,6 +17,7 @@ router.get('/admin/stats', authenticate, authorize('admin'), validate({ query: d
 router.get('/admin/payouts', authenticate, authorize('admin'), financeController.getAllPayouts);
 router.post('/admin/payouts', authenticate, authorize('admin'), validate({ body: createPayoutSchema }), financeController.createPayout);
 router.put('/admin/payouts/:id/paid', authenticate, authorize('admin'), validate({ params: payoutIdParamSchema }), validate({ body: paymentRefSchema }), financeController.markPayoutPaid);
+router.put('/admin/payouts/:id/rejected', authenticate, authorize('admin'), validate({ params: payoutIdParamSchema }), validate({ body: rejectPayoutSchema }), financeController.rejectPayout);
 router.get('/admin/export', authenticate, authorize('admin'), validate({ query: dateRangeSchema }), financeController.exportOrdersCSV);
 
 module.exports = router;

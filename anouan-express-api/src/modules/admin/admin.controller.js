@@ -76,6 +76,15 @@ const deleteFlashSale = async (req, res, next) => {
   }
 };
 
+const getStats = async (req, res, next) => {
+  try {
+    const data = await adminService.getDashboardStats();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getPlatformSettings = async (req, res, next) => {
   try {
     const data = await adminService.getPlatformSettings();
@@ -140,6 +149,7 @@ module.exports = {
   getFlashSales,
   createFlashSale,
   deleteFlashSale,
+  getStats,
   getPlatformSettings,
   updateSetting,
   getUserRoles,

@@ -105,13 +105,13 @@ const SmsToast = ({ msg, onClose }) => (
 
 /* ──────── Page Principale ──────── */
 export default function AdminVendorsPage() {
-  const [vendors, setVendors] = useState(MOCK_VENDORS);
+  const [vendors, setVendors] = useState([]);
 
   const loadVendors = async () => {
     try {
       const res = await vendorsAPI.getAll({ limit: 100 });
       const vData = res.data?.data || res.data || [];
-      if (Array.isArray(vData) && vData.length > 0) {
+      if (Array.isArray(vData)) {
         setVendors(vData.map(v => ({
           id: v.id,
           name: v.shop_name,
@@ -129,6 +129,7 @@ export default function AdminVendorsPage() {
       }
     } catch (e) {
       console.error('Erreur chargement vendeurs:', e);
+      setVendors([]);
     }
   };
 
@@ -220,10 +221,11 @@ export default function AdminVendorsPage() {
     try {
       await vendorsAPI.updateStatus(id, { action });
       await loadVendors();
+      logAction(id, `Statut boutique modifié en "${newStatus}" dans la base de données`);
     } catch (e) {
       alert(e.response?.data?.message || 'Erreur lors de la mise à jour du vendeur.');
+      return;
     }
-    logAction(id, `Statut boutique modifié en "${newStatus}" dans la base de données`);
     const vendor = vendors.find((v) => v.id === id);
     if (vendor && (newStatus === 'Actif' || newStatus === 'Suspendu')) {
       sendVendorAlert(vendor, newStatus);
