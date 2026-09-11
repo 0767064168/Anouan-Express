@@ -101,7 +101,7 @@ const loginWithPassword = async ({ email, password }) => {
 
 // ─── OTP SMS ──────────────────────────────────────────────────
 
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+const generateOTP = () => crypto.randomInt(100000, 1000000).toString();
 
 const sendOTP = async ({ phone }) => {
   const result = await query('SELECT id FROM users WHERE phone = $1', [phone]);
@@ -212,7 +212,7 @@ const resetPassword = async ({ token, email, newPassword }) => {
 
   const passwordHash = await bcrypt.hash(newPassword, env.bcrypt.rounds);
   await query(
-    'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires_at = NULL, otp_code = NULL, otp_expires_at = NULL WHERE id = $2',
+    'UPDATE users SET password_hash = $1, refresh_token = NULL, reset_token = NULL, reset_token_expires_at = NULL, otp_code = NULL, otp_expires_at = NULL WHERE id = $2',
     [passwordHash, user.id]
   );
 

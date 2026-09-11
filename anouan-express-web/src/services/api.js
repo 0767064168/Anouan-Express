@@ -12,14 +12,27 @@ const api = axios.create({
   withCredentials: true,
 });
 
+const getCookie = (name) => {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+api.interceptors.request.use((config) => {
+  const csrfToken = getCookie('csrfToken');
+  if (csrfToken && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
+    config.headers['X-CSRF-Token'] = csrfToken;
+  }
+  return config;
+});
+
 // ─── Intercepteur de réponse : refresh token automatique ──────
 let isRefreshing = false;
 let failedQueue = [];
 
-const processQueue = (error, token = null) => {
+const processQueue = (error) => {
   failedQueue.forEach((prom) => {
     if (error) prom.reject(error);
-    else prom.resolve(token);
+    else prom.resolve();
   });
   failedQueue = [];
 };
@@ -34,10 +47,7 @@ api.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return api(originalRequest);
-          })
+          .then(() => api(originalRequest))
           .catch((err) => Promise.reject(err));
       }
 
@@ -45,11 +55,14 @@ api.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
-        processQueue(null, true);
+        await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': getCookie('csrfToken') || '' },
+        });
+        processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
-        processQueue(refreshError, null);
+        processQueue(refreshError);
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
@@ -75,6 +88,8 @@ export const authAPI = {
 
 export const usersAPI = {
   getMe: () => api.get('/users/me'),
+  getAll: (params) => api.get('/users', { params }),
+  updateStatus: (id, status) => api.put(`/users/${id}/status`, { status }),
   updateMe: (data) => api.put('/users/me', data),
   updateAvatar: (formData) =>
     api.post('/users/me/avatar', formData, {
@@ -139,11 +154,11 @@ export const reviewsAPI = {
 export const vendorsAPI = {
   getMyVendor: () => api.get('/vendors/me'),
   updateMyVendor: (data) => api.put('/vendors/me', data),
-  getDashboard: () => api.get('/vendors/dashboard'),
+  getDashboard: () => api.get('/vendors/me/stats'),
   getAll: (params) => api.get('/vendors', { params }),
   getById: (id) => api.get(`/vendors/${id}`),
-  updateStatus: (id, data) => api.patch(`/vendors/${id}/status`, data),
-  updateCommission: (id, data) => api.patch(`/vendors/${id}/commission`, data),
+  updateStatus: (id, data) => api.put(`/vendors/${id}/validate`, data),
+  updateCommission: (id, data) => api.put(`/vendors/${id}/commission`, data),
   register: (data) => api.post('/vendors/register', data),
 };
 
@@ -160,8 +175,8 @@ export const financeAPI = {
 
 export const notificationsAPI = {
   getAll: (params) => api.get('/notifications', { params }),
-  markRead: (id) => api.patch(`/notifications/${id}/read`),
-  markAllRead: () => api.patch('/notifications/read-all'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/read-all'),
 };
 
 export const adminAPI = {
@@ -177,7 +192,7 @@ export const adminAPI = {
   updateFlashSale: (id, data) => api.put(`/admin/flash-sales/${id}`, data),
   deleteFlashSale: (id) => api.delete(`/admin/flash-sales/${id}`),
   getSettings: () => api.get('/admin/settings'),
-  updateSettings: (data) => api.put('/admin/settings', data),
+  updateSetting: (key, data) => api.put(`/admin/settings/${key}`, data),
 };
 
 export const messagesAPI = {
@@ -192,7 +207,7 @@ export const disputesAPI = {
   create: (data) => api.post('/disputes', data),
   getMyDisputes: () => api.get('/disputes/my'),
   getAll: (params) => api.get('/disputes', { params }),
-  resolve: (id, data) => api.patch(`/disputes/${id}/resolve`, data),
+  resolve: (id, data) => api.put(`/disputes/${id}/resolve`, data),
 };
 
 export default api;

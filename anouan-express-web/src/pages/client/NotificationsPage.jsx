@@ -65,22 +65,23 @@ export default function NotificationsPage() {
   const markAllRead = async () => {
     try {
       await notificationsAPI.markAllRead();
-    } catch {}
-    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
-    toast.success('Toutes les notifications ont été marquées comme lues.');
+      setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+      toast.success('Toutes les notifications ont été marquées comme lues.');
+    } catch (err) {
+      toast.error('Impossible de marquer les notifications comme lues.');
+    }
   };
 
   const markRead = async (id) => {
     try {
       await notificationsAPI.markRead(id);
-    } catch {}
-    setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+      setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
+    } catch (err) {
+      toast.error('Impossible de marquer cette notification comme lue.');
+    }
   };
 
-  const deleteNotif = async (id) => {
-    try {
-      await notificationsAPI.delete(id);
-    } catch {}
+  const deleteNotif = (id) => {
     setNotifs((prev) => prev.filter((n) => n.id !== id));
     toast.info('Notification supprimée.');
   };

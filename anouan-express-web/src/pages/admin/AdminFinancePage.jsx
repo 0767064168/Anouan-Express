@@ -91,6 +91,7 @@ export default function AdminFinancePage() {
   const [stats, setStats]                   = useState({ totalRevenue: 14250000, totalCommission: 1567500, pendingPayouts: 415000, paidPayouts: 1435000 });
   const [payouts, setPayouts]               = useState([]);
   const [loading, setLoading]               = useState(true);
+  const [loadError, setLoadError]           = useState('');
   const [actionNotice, setActionNotice]     = useState(null);
   const [agents, setAgents]                 = useState(DEFAULT_AGENTS);
   const [selectedAgent, setSelectedAgent]   = useState(null);  // modal fiche
@@ -106,6 +107,7 @@ export default function AdminFinancePage() {
 
   const loadData = async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [payoutsRes, statsRes] = await Promise.all([
         financeAPI.getAllPayouts().catch(() => null),
@@ -131,7 +133,7 @@ export default function AdminFinancePage() {
         }));
         setPayouts(mapped);
       } else {
-        setPayouts(DEMO_PAYOUTS);
+        setPayouts([]);
       }
 
       if (statsRes?.data) {
@@ -140,7 +142,8 @@ export default function AdminFinancePage() {
       }
     } catch (err) {
       console.error("Erreur chargement finances:", err);
-      setPayouts(DEMO_PAYOUTS);
+      setPayouts([]);
+      setLoadError('Les données financières sont momentanément indisponibles.');
     } finally {
       setLoading(false);
     }
@@ -235,6 +238,12 @@ export default function AdminFinancePage() {
           <button onClick={() => setActionNotice(null)} className="text-slate-500 hover:text-white p-1">
             <X size={13} />
           </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-2xl text-xs font-bold">
+          {loadError}
         </div>
       )}
 

@@ -24,6 +24,15 @@ const getVendorPayouts = async (req, res, next) => {
   }
 };
 
+const requestVendorPayout = async (req, res, next) => {
+  try {
+    const data = await financeService.requestVendorPayout(req.user.id, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const getAllPayouts = async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -90,6 +99,7 @@ const exportOrdersCSV = async (req, res, next) => {
 module.exports = {
   getVendorStats,
   getVendorPayouts,
+  requestVendorPayout,
   getAllPayouts,
   createPayout,
   markPayoutPaid,

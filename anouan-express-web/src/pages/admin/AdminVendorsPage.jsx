@@ -237,7 +237,7 @@ export default function AdminVendorsPage() {
     const val = parseFloat(commission);
     if (!isNaN(val) && val !== selectedVendor.commission) {
       try {
-        await vendorsAPI.updateCommission(selectedVendor.id, { commissionRate: val });
+        await vendorsAPI.updateCommission(selectedVendor.id, { rate: val });
         await loadVendors();
       } catch (e) {}
       logAction(selectedVendor.id, `Commission ajustée à ${val}%`);

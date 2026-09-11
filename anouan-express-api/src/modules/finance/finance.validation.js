@@ -8,6 +8,12 @@ const createPayoutSchema = Joi.object({
   notes: Joi.string().allow('', null).optional()
 });
 
+const requestVendorPayoutSchema = Joi.object({
+  amount: Joi.number().positive().required(),
+  method: Joi.string().valid('orange', 'mtn', 'wave', 'cash').required(),
+  phone: Joi.string().pattern(/^\+?[0-9]{8,15}$/).required(),
+});
+
 const dateRangeSchema = Joi.object({
   dateFrom: Joi.date().iso().optional(),
   dateTo: Joi.date().iso().optional()
@@ -23,6 +29,7 @@ const paymentRefSchema = Joi.object({
 
 module.exports = {
   createPayoutSchema,
+  requestVendorPayoutSchema,
   dateRangeSchema,
   payoutIdParamSchema,
   paymentRefSchema

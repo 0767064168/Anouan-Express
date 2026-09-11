@@ -69,7 +69,10 @@ const getVendorStats = async (vendorId, { dateFrom, dateTo }) => {
 
 const getVendorPayouts = async (vendorId, page, limit) => {
   const offset = (page - 1) * limit;
-  const countRes = await query('SELECT COUNT(*) FROM vendor_payouts WHERE vendor_id = $1', [vendorId]);
+  const vendorRes = await query('SELECT id FROM vendors WHERE user_id = $1 OR id = $1 LIMIT 1', [vendorId]);
+  if (!vendorRes.rows.length) throw new AppError('Vendeur introuvable.', 404, 'VENDOR_NOT_FOUND');
+  const resolvedVendorId = vendorRes.rows[0].id;
+  const countRes = await query('SELECT COUNT(*) FROM vendor_payouts WHERE vendor_id = $1', [resolvedVendorId]);
   const total = parseInt(countRes.rows[0].count, 10);
   
   const res = await query(`
@@ -77,12 +80,67 @@ const getVendorPayouts = async (vendorId, page, limit) => {
     WHERE vendor_id = $1 
     ORDER BY created_at DESC 
     LIMIT $2 OFFSET $3
-  `, [vendorId, limit, offset]);
+  `, [resolvedVendorId, limit, offset]);
 
   return {
     data: res.rows,
     pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
   };
+};
+
+const requestVendorPayout = async (userId, { amount, method, phone }) => {
+  const vendorRes = await query(
+    "SELECT id FROM vendors WHERE user_id = $1 AND validation_status = 'approved'",
+    [userId]
+  );
+  if (!vendorRes.rows.length) throw new AppError('Vendeur introuvable ou non approuvé.', 403, 'VENDOR_NOT_APPROVED');
+
+  const vendorId = vendorRes.rows[0].id;
+  const pendingRes = await query(
+    "SELECT id FROM vendor_payouts WHERE vendor_id = $1 AND status IN ('pending', 'processing') LIMIT 1",
+    [vendorId]
+  );
+  if (pendingRes.rows.length) throw new AppError('Une demande de versement est déjà en cours.', 409, 'PAYOUT_ALREADY_PENDING');
+
+  const balanceRes = await query(`
+    SELECT
+      COALESCE(SUM(CASE WHEN o.status = 'picked_up' THEN oi.unit_price * oi.quantity ELSE 0 END), 0) AS gross_revenue,
+      COALESCE((SELECT SUM(amount_paid) FROM vendor_payouts WHERE vendor_id = $1 AND status = 'paid'), 0) AS paid_amount,
+      COALESCE((SELECT SUM(amount_due) FROM vendor_payouts WHERE vendor_id = $1 AND status IN ('pending', 'processing')), 0) AS pending_amount,
+      COALESCE(v.commission_rate, 0) AS commission_rate
+    FROM vendors v
+    LEFT JOIN order_items oi ON oi.vendor_id = v.id
+    LEFT JOIN orders o ON o.id = oi.order_id AND o.status = 'picked_up'
+    WHERE v.id = $1
+    GROUP BY v.id, v.commission_rate
+  `, [vendorId]);
+  const balance = balanceRes.rows[0];
+  const grossRevenue = Number(balance?.gross_revenue || 0);
+  const commission = grossRevenue * (Number(balance?.commission_rate || 0) / 100);
+  const availableBalance = Math.max(0, grossRevenue - commission - Number(balance?.paid_amount || 0) - Number(balance?.pending_amount || 0));
+  if (Number(amount) > availableBalance) {
+    throw new AppError('Le montant dépasse le solde disponible.', 422, 'INSUFFICIENT_PAYOUT_BALANCE');
+  }
+
+  const start = new Date();
+  start.setUTCDate(1);
+  const end = new Date();
+  const payoutRes = await query(
+    `INSERT INTO vendor_payouts
+      (vendor_id, period_start, period_end, amount_due, status, payout_method, payout_phone, notes, created_at)
+     VALUES ($1, $2::date, $3::date, $4, 'pending', $5, $6, $7, NOW())
+     RETURNING *`,
+    [vendorId, start.toISOString(), end.toISOString(), amount, method, phone, 'Demande initiée par le vendeur']
+  );
+
+  await logAudit('finance.vendor_payout_requested', userId, {
+    payoutId: payoutRes.rows[0].id,
+    vendorId,
+    amount,
+    method,
+  });
+
+  return payoutRes.rows[0];
 };
 
 const getAllPayouts = async (page, limit, filters) => {
@@ -292,6 +350,7 @@ const exportOrdersCSV = async (filters) => {
 module.exports = {
   getVendorStats,
   getVendorPayouts,
+  requestVendorPayout,
   getAllPayouts,
   createPayout,
   markPayoutPaid,

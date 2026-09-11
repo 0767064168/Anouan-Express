@@ -14,7 +14,7 @@ const formatDate = (d) =>
 
 export default function VendorFinancePage() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({ availableBalance: 175000, pendingBalance: 45000, totalPaid: 850000 });
+  const [stats, setStats] = useState({ availableBalance: 0, pendingBalance: 0, totalPaid: 0 });
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [payoutModal, setPayoutModal] = useState(false);
@@ -37,22 +37,25 @@ export default function VendorFinancePage() {
     setLoading(true);
     try {
       const [statsRes, historyRes] = await Promise.all([
-        financeAPI.getVendorStats().catch(() => ({ data: { data: { availableBalance: 175000, pendingBalance: 45000, totalPaid: 850000 } } })),
-        financeAPI.getVendorHistory().catch(() => ({ data: { data: [] } })),
+        financeAPI.getVendorStats(),
+        financeAPI.getVendorHistory(),
       ]);
 
-      const baseStats = statsRes.data?.data || statsRes.data || { availableBalance: 175000, pendingBalance: 45000, totalPaid: 850000 };
-      const baseHistory = historyRes.data?.data || historyRes.data || [];
+      const baseStats = statsRes.data?.data || statsRes.data || {};
+      const historyPayload = historyRes.data || {};
+      const baseHistory = historyPayload.data?.data || historyPayload.data || [];
 
       setStats({
-        availableBalance: baseStats.availableBalance || baseStats.total_revenue || 175000,
-        pendingBalance: baseStats.pendingBalance || 0,
-        totalPaid: baseStats.totalPaid || 0,
+        availableBalance: Number(baseStats.availableBalance ?? baseStats.net_revenue ?? 0),
+        pendingBalance: Number(baseStats.pendingBalance ?? 0),
+        totalPaid: Number(baseStats.totalPaid ?? 0),
       });
 
       setHistory(Array.isArray(baseHistory) ? baseHistory : []);
-    } catch {
-      // Fallback
+    } catch (err) {
+      setStats({ availableBalance: 0, pendingBalance: 0, totalPaid: 0 });
+      setHistory([]);
+      setError('Les données financières sont momentanément indisponibles.');
     } finally {
       setLoading(false);
     }
@@ -74,16 +77,6 @@ export default function VendorFinancePage() {
 
     setSubmitting(true);
     try {
-      try {
-        await financeAPI.requestPayout({
-          amount: amt,
-          method: payoutMethod,
-          phone,
-        });
-      } catch {
-        // Mode local
-      }
-
       await financeAPI.requestPayout({
         amount: amt,
         method: payoutMethod,

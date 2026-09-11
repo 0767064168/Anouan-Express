@@ -21,6 +21,9 @@ const registerSchema = {
     }),
     phone: phone.optional(),
     password: password.required(),
+    role: Joi.string().valid('client', 'vendor').default('client'),
+    shopName: Joi.string().max(255).allow('', null),
+    storeLocation: Joi.string().max(255).allow('', null),
   }).or('email', 'phone'),
 };
 

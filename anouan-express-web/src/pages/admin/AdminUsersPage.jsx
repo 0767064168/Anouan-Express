@@ -2,9 +2,10 @@
 // Gestion des comptes Clients — Dark Premium Orange
 
 import React, { useState, useEffect } from 'react';
-import { Users, Search, Filter, UserCheck, UserX, ShieldAlert, Trash2, Eye, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Search, Filter, UserCheck, UserX, ShieldAlert, RefreshCw } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import PageHeader from '../../components/ui/PageHeader';
+import { usersAPI } from '../../services/api';
 
 const DEMO_USERS = [
   { id: 1, name: 'Kouadio Jean-Marc', email: 'jm.kouadio@gmail.com', phone: '+225 07 45 12 88', role: 'client', status: 'active', orders: 12, joined: '12 jan 2026' },
@@ -32,12 +33,34 @@ const STATUS_BADGE = {
 
 export default function AdminUsersPage() {
   const toast = useToast();
-  const [users, setUsers] = useState(DEMO_USERS);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selected, setSelected] = useState([]);
+
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const res = await usersAPI.getAll({ limit: 100 });
+      const data = res.data?.data || res.data || [];
+      setUsers(Array.isArray(data) ? data.map((user) => ({
+        ...user,
+        orders: user.orders || 0,
+        joined: user.created_at ? new Date(user.created_at).toLocaleDateString('fr-CI') : '—',
+      })) : []);
+    } catch (err) {
+      setUsers([]);
+      toast.error('Impossible de charger les utilisateurs.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   const filtered = users.filter((u) => {
     const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase()) || u.phone.includes(search);
@@ -49,16 +72,16 @@ export default function AdminUsersPage() {
   const toggleSelect = (id) => setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
   const toggleSelectAll = () => setSelected(selected.length === filtered.length ? [] : filtered.map((u) => u.id));
 
-  const handleBan = (userId) => {
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: u.status === 'banned' ? 'active' : 'banned' } : u));
+  const handleBan = async (userId) => {
     const u = users.find((x) => x.id === userId);
-    toast.success(`Compte de ${u.name} ${u.status === 'banned' ? 'réactivé' : 'suspendu'}.`);
-  };
-
-  const handleDelete = (userId) => {
-    const u = users.find((x) => x.id === userId);
-    setUsers((prev) => prev.filter((x) => x.id !== userId));
-    toast.error(`Compte de ${u.name} supprimé définitivement.`);
+    const nextStatus = u.status === 'banned' ? 'active' : 'banned';
+    try {
+      await usersAPI.updateStatus(userId, nextStatus);
+      setUsers((prev) => prev.map((user) => user.id === userId ? { ...user, status: nextStatus } : user));
+      toast.success(`Compte de ${u.name} ${nextStatus === 'active' ? 'réactivé' : 'suspendu'}.`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Impossible de modifier le statut du compte.');
+    }
   };
 
   const stats = {
@@ -77,7 +100,7 @@ export default function AdminUsersPage() {
         subtitle={`${stats.total} comptes enregistrés sur la plateforme`}
         actions={(
           <button
-            onClick={() => { setLoading(true); setTimeout(() => { setLoading(false); toast.success('Liste rafraîchie.'); }, 600); }}
+            onClick={loadUsers}
             className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Rafraîchir
@@ -207,13 +230,6 @@ export default function AdminUsersPage() {
                           className={`p-2 rounded-xl transition-colors ${u.status === 'banned' ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-amber-400 hover:bg-amber-500/10'}`}
                         >
                           {u.status === 'banned' ? <UserCheck size={15} /> : <UserX size={15} />}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          title="Supprimer"
-                          className="p-2 rounded-xl text-red-400 hover:bg-red-500/10 transition-colors"
-                        >
-                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>

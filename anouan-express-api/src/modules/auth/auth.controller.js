@@ -2,6 +2,7 @@
 // Contrôleur HTTP pour les routes d'authentification
 
 const authService = require('./auth.service');
+const { CSRF_COOKIE, createCsrfToken } = require('../../middlewares/csrf');
 
 const cookieOptions = (maxAge) => ({
   httpOnly: true,
@@ -14,6 +15,12 @@ const cookieOptions = (maxAge) => ({
 const setAuthCookies = (res, { accessToken, refreshToken }) => {
   res.cookie('accessToken', accessToken, cookieOptions(15 * 60 * 1000));
   res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+  res.cookie(CSRF_COOKIE, createCsrfToken(), {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+  });
 };
 
 const withoutTokens = ({ accessToken, refreshToken, ...data }) => data;
@@ -64,6 +71,7 @@ const logout = async (req, res, next) => {
     await authService.logout(req.user.id);
     res.clearCookie('accessToken', { path: '/' });
     res.clearCookie('refreshToken', { path: '/' });
+    res.clearCookie(CSRF_COOKIE, { path: '/' });
     res.json({ success: true, message: 'Déconnecté avec succès.' });
   } catch (err) { next(err); }
 };

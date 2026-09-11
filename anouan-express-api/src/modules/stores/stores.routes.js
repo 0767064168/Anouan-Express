@@ -9,8 +9,8 @@ const { createStoreSchema, updateStoreSchema } = require('./stores.validation');
 router.get('/', authenticateOptional, storesController.getAll);
 router.get('/:id', authenticateOptional, storesController.getById);
 
-router.post('/', authenticate, authorize('admin'), validate(createStoreSchema), storesController.create);
-router.put('/:id', authenticate, authorize('admin'), validate(updateStoreSchema), storesController.update);
+router.post('/', authenticate, authorize('admin'), validate({ body: createStoreSchema }), storesController.create);
+router.put('/:id', authenticate, authorize('admin'), validate({ body: updateStoreSchema }), storesController.update);
 router.patch('/:id/toggle', authenticate, authorize('admin'), storesController.toggleActive);
 
 module.exports = router;

@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Settings, Globe, Bell, Shield, Palette, Save, CheckCircle } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
+import { adminAPI } from '../../services/api';
 
 const SECTIONS = [
   { key: 'general',     label: 'Général',         icon: Globe },
@@ -13,6 +14,8 @@ const SECTIONS = [
 export default function AdminSettingsPage() {
   const [active, setActive] = useState('general');
   const [saved, setSaved]   = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [form, setForm]     = useState({
     platformName: 'Anouan Express',
     currency: 'FCFA',
@@ -31,9 +34,34 @@ export default function AdminSettingsPage() {
 
   const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await adminAPI.getSettings();
+        const data = res.data?.data || res.data || {};
+        const parsed = Object.fromEntries(Object.entries(data).map(([key, value]) => {
+          try { return [key, JSON.parse(value)]; } catch { return [key, value]; }
+        }));
+        setForm((current) => ({ ...current, ...parsed }));
+      } catch (err) {
+        setError('Impossible de charger les paramètres enregistrés.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleSave = async () => {
+    setSaved(false);
+    setError('');
+    try {
+      await Promise.all(Object.entries(form).map(([key, value]) => adminAPI.updateSetting(key, { value })));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError('Impossible d’enregistrer les paramètres.');
+    }
   };
 
   const inputCls = "w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none transition-all";
@@ -65,6 +93,9 @@ export default function AdminSettingsPage() {
           </button>
         )}
       />
+
+      {error && <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-2xl text-xs font-bold">{error}</div>}
+      {loading && <div className="text-xs text-slate-500">Chargement des paramètres...</div>}
 
       <div className="flex gap-6">
         {/* Sidebar */}
