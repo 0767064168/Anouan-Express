@@ -2,9 +2,11 @@
 // Commandes reçues par le vendeur + mise à jour du statut + Impression Bordereau A4 avec QR Code
 
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Eye, X, ChevronDown, Package, Printer } from 'lucide-react';
+import { Filter, Eye, X, Package, Printer } from 'lucide-react';
 import { ordersAPI } from '../../services/api';
 import DeliverySlipModal from '../../components/vendor/DeliverySlipModal';
+import DataToolbar from '../../components/ui/DataToolbar';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const formatDate = (d) =>
@@ -107,39 +109,33 @@ export default function VendorOrdersPage() {
 
   return (
     <div className="space-y-5 bg-slate-950 p-6 min-h-screen">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">Commandes reçues</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{orders.length} commande(s)</p>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Espace Vendeur"
+        eyebrowIcon={Package}
+        title="Commandes reçues"
+        subtitle={`${orders.length} commande(s) à traiter`}
+      />
 
-      {/* Filtres */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher..."
-            className="pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-orange-500 outline-none w-52 transition-colors"
-          />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+      <DataToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Rechercher par commande ou client..."
+        hasActiveFilters={Boolean(search || filterStatus)}
+        onReset={() => { setSearch(''); setFilterStatus(''); setPage(1); }}
+      >
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-slate-500" />
           <select
             value={filterStatus}
             onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-            className="pl-9 pr-8 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-orange-500 outline-none appearance-none cursor-pointer transition-colors"
+            className="bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-orange-500 outline-none px-4 py-2.5 cursor-pointer transition-colors"
           >
             {STATUS_OPTIONS.map((s) => (
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
         </div>
-      </div>
+      </DataToolbar>
 
       {/* Liste des commandes */}
       {loading ? (

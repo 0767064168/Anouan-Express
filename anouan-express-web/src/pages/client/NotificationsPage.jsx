@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Package, Tag, ShieldCheck, Info, CheckCheck, Trash2 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import { notificationsAPI } from '../../services/api';
+import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_NOTIFS = [
   {
@@ -93,39 +94,39 @@ export default function NotificationsPage() {
     <div className="min-h-screen bg-slate-950 py-10 text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-black text-white tracking-tight">Notifications</h1>
+        <PageHeader
+          title={
+            <span className="flex items-center gap-3">
+              Notifications
               {unreadCount > 0 && (
                 <span className="bg-orange-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-full shadow-lg shadow-orange-500/30">
                   {unreadCount} nouvelle{unreadCount > 1 ? 's' : ''}
                 </span>
               )}
-            </div>
-            <p className="text-xs text-slate-400">Toutes vos alertes commandes, promos et sécurité</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 px-4 py-2.5 rounded-2xl transition-all"
-              >
-                <CheckCheck size={14} /> Tout marquer lu
-              </button>
-            )}
-            {notifs.length > 0 && (
-              <button
-                onClick={clearAll}
-                className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl transition-all"
-              >
-                <Trash2 size={14} /> Tout supprimer
-              </button>
-            )}
-          </div>
-        </div>
+            </span>
+          }
+          subtitle="Toutes vos alertes commandes, promos et sécurité"
+          actions={(
+            <>
+              {unreadCount > 0 && (
+                <button
+                  onClick={markAllRead}
+                  className="flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 bg-orange-500/10 border border-orange-500/20 px-4 py-2.5 rounded-2xl transition-all"
+                >
+                  <CheckCheck size={14} /> Tout marquer lu
+                </button>
+              )}
+              {notifs.length > 0 && (
+                <button
+                  onClick={clearAll}
+                  className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl transition-all"
+                >
+                  <Trash2 size={14} /> Tout supprimer
+                </button>
+              )}
+            </>
+          )}
+        />
 
         {/* Filtres par type */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1">

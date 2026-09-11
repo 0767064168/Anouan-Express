@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { messagesAPI } from '../../services/api';
 import Emoji from '../../components/ui/Emoji';
+import PageHeader from '../../components/ui/PageHeader';
 
 const VENDOR_CONVERSATIONS = [
   {
@@ -214,19 +215,19 @@ export default function VendorChatPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-110px)] lg:h-[calc(100vh-150px)] text-slate-100 font-sans gap-3">
       
-      {/* Header Espace Vendeur Messagerie */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-2.5 shrink-0">
-        <div>
-          <div className="flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-0.5">
-            <MessageSquare size={15} /> Messagerie Vendeur Live
+      <PageHeader
+        eyebrow="Messagerie Vendeur Live"
+        eyebrowIcon={MessageSquare}
+        title="Conversations avec vos Clients"
+        subtitle="Répondez aux demandes clients et suivez les échanges liés aux commandes."
+        className="shrink-0"
+        actions={(
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-2xl text-emerald-400 text-xs font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Boutique En Ligne & Support Actif
           </div>
-          <h1 className="text-xl font-black text-white tracking-tight">Conversations avec vos Clients</h1>
-        </div>
-        <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-2xl text-emerald-400 text-xs font-bold">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          Boutique En Ligne & Support Actif
-        </div>
-      </div>
+        )}
+      />
 
       {/* Panneau Principal Messagerie Vendeur (Adapte sa hauteur dynamiquement) */}
       <div className="glass-panel rounded-3xl border border-slate-800 grid grid-cols-1 lg:grid-cols-12 flex-1 min-h-0 overflow-hidden shadow-2xl">

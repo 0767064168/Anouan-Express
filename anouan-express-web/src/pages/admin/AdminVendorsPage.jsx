@@ -7,6 +7,7 @@ import {
   Clock, MessageSquare, History, Bell, Send
 } from 'lucide-react';
 import { vendorsAPI } from '../../services/api';
+import PageHeader from '../../components/ui/PageHeader';
 
 const getNowStr = () =>
   new Date().toLocaleString('fr-CI', {
@@ -269,19 +270,18 @@ export default function AdminVendorsPage() {
       {/* Toast SMS simulé */}
       {smsToast && <SmsToast msg={smsToast} onClose={() => setSmsToast(null)} />}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Gestion des Vendeurs</h1>
-          <p className="text-slate-400 text-xs mt-1">Supervisez, validez et gérez les comptes vendeurs de la plateforme.</p>
-        </div>
-        {newVendorCount > 0 && (
+      <PageHeader
+        eyebrow="Administration Partenaires"
+        eyebrowIcon={Store}
+        title="Gestion des Vendeurs"
+        subtitle="Supervisez, validez et gérez les comptes vendeurs de la plateforme."
+        actions={newVendorCount > 0 && (
           <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 text-amber-400 px-4 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
             <Bell size={14} />
             {newVendorCount} nouvelle{newVendorCount > 1 ? 's' : ''} demande{newVendorCount > 1 ? 's' : ''}
           </div>
         )}
-      </div>
+      />
 
       {/* Stats rapides */}
       <div className="grid grid-cols-3 gap-4">

@@ -14,6 +14,8 @@ import {
 } from 'recharts';
 import { adminAPI, ordersAPI, vendorsAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -191,65 +193,49 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-8 text-slate-100 font-sans">
 
-      {/* Header avec Raccourcis d'Action Admin */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-800 pb-6">
-        <div>
-          <div className="flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-1">
-            <Activity size={15} className="animate-pulse" /> Console d'Administration Live
-          </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Vue d'Ensemble Anouan Express</h1>
-          <p className="text-slate-400 text-xs mt-1">Supervision des ventes, retraits au magasin central et activités vendeurs à Bouaké</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            to="/admin/vendors"
-            className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-2xl transition-all shadow-lg text-xs"
-          >
-            <Store size={15} /> Valider Vendeurs <span className="bg-slate-950 text-orange-400 text-[10px] font-black px-1.5 py-0.5 rounded-full">3</span>
-          </Link>
-          <Link
-            to="/admin/users"
-            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
-          >
-            <Users size={15} className="text-orange-400" /> Gestion Utilisateurs
-          </Link>
-          <button
-            onClick={() => toast.info('Rapport mensuel PDF généré et téléchargé.')}
-            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
-          >
-            <Download size={15} className="text-orange-400" /> Rapport PDF
-          </button>
-        </div>
-      </div>
-
-      {/* Cartes KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-        {statCards.map((stat, i) => {
-          const Icon = stat.icon;
-          return (
-            <div
-              key={i}
-              className={`relative bg-gradient-to-br ${stat.gradient} border ${stat.border} rounded-3xl p-6 overflow-hidden hover:scale-[1.02] transition-all duration-300 shadow-xl`}
+      <PageHeader
+        eyebrow="Console d'Administration Live"
+        eyebrowIcon={Activity}
+        title="Vue d'Ensemble Anouan Express"
+        subtitle="Supervision des ventes, retraits au magasin central et activités vendeurs à Bouaké"
+        actions={
+          <>
+            <Link
+              to="/admin/vendors"
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-2xl transition-all shadow-lg text-xs"
             >
-              <div className="flex justify-between items-start mb-4">
-                <div className={`p-2.5 rounded-2xl border ${stat.iconBg}`}>
-                  <Icon size={20} />
-                </div>
-                <span className={`flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-full ${
-                  stat.isPositive
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-                    : 'bg-red-500/15 text-red-400 border border-red-500/25'
-                }`}>
-                  <ArrowUpRight size={12} />
-                  {stat.change}
-                </span>
-              </div>
-              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{stat.title}</p>
-              <p className="text-2xl font-black text-white mt-1 leading-tight">{stat.value}</p>
-            </div>
-          );
-        })}
+              <Store size={15} /> Valider Vendeurs <span className="bg-slate-950 text-orange-400 text-[10px] font-black px-1.5 py-0.5 rounded-full">3</span>
+            </Link>
+            <Link
+              to="/admin/users"
+              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+            >
+              <Users size={15} className="text-orange-400" /> Gestion Utilisateurs
+            </Link>
+            <button
+              onClick={() => toast.info('Rapport mensuel PDF généré et téléchargé.')}
+              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+            >
+              <Download size={15} className="text-orange-400" /> Rapport PDF
+            </button>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {statCards.map((stat, i) => (
+          <StatCard
+            key={i}
+            title={stat.title}
+            value={stat.value}
+            change={stat.change}
+            isPositive={stat.isPositive}
+            icon={stat.icon}
+            gradient={stat.gradient}
+            iconBg={stat.iconBg}
+            border={stat.border}
+          />
+        ))}
       </div>
 
       {/* Graphique Interactif des Ventes & Flux de Titres */}

@@ -7,6 +7,7 @@ import {
   Loader2, CheckCircle, AlertTriangle, Sparkles, Wand2, Bot, Star, Image as ImageIcon, FileText
 } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../../services/api';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (price) => new Intl.NumberFormat('fr-CI').format(Number(price || 0)) + ' FCFA';
 
@@ -385,20 +386,20 @@ export default function VendorProductsPage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">Mes Produits</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{products.length} produit(s) dans votre boutique</p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors"
-        >
-          <Plus size={18} />
-          Ajouter un produit
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Espace Vendeur"
+        eyebrowIcon={Package}
+        title="Mes Produits"
+        subtitle={`${products.length} produit(s) dans votre boutique`}
+        actions={(
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors"
+          >
+            <Plus size={18} /> Ajouter un produit
+          </button>
+        )}
+      />
 
       {/* Search */}
       <div className="relative">

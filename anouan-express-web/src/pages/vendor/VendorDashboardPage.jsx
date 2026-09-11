@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 import { vendorsAPI, ordersAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import VendorAnalyticsChart from '../../components/vendor/VendorAnalyticsChart';
+import PageHeader from '../../components/ui/PageHeader';
+import StatCard from '../../components/ui/StatCard';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const formatDate  = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -96,45 +98,43 @@ export default function VendorDashboardPage() {
   return (
     <div className="space-y-8 text-slate-100 font-sans">
       
-      {/* Header avec Raccourcis Vendeur */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-6">
-        <div>
-          <div className="flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-1">
-            <Store size={15} /> Espace Vendeur Partenaire
-          </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Boutique « Maison du Pagne Bouaké »</h1>
-          <p className="text-slate-400 text-xs mt-1">Gestion de votre catalogue, commandes et dépôts au Magasin Central</p>
-        </div>
+      <PageHeader
+        eyebrow="Espace Vendeur Partenaire"
+        eyebrowIcon={Store}
+        title="Boutique « Maison du Pagne Bouaké »"
+        subtitle="Gestion de votre catalogue, commandes et dépôts au Magasin Central"
+        actions={
+          <>
+            <Link
+              to="/vendor/products"
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-2xl transition-all shadow-lg text-xs"
+            >
+              <Plus size={16} /> Ajouter un Produit
+            </Link>
+            <Link
+              to="/vendor/finance"
+              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+            >
+              💸 Demander Versement
+            </Link>
+          </>
+        }
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/vendor/products"
-            className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-4 py-2.5 rounded-2xl transition-all shadow-lg text-xs"
-          >
-            <Plus size={16} /> Ajouter un Produit
-          </Link>
-          <Link
-            to="/vendor/finance"
-            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-200 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
-          >
-            💸 Demander Versement
-          </Link>
-        </div>
-      </div>
-
-      {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {kpis.map((k, i) => {
-          const Icon = k.icon;
-          return (
-            <div key={i} className={`bg-gradient-to-br ${k.grad} border border-slate-800 rounded-3xl p-6 hover:scale-[1.02] transition-all duration-300 shadow-xl`}>
-              <div className={`p-2.5 rounded-2xl border w-fit mb-4 ${k.iconCls}`}><Icon size={20}/></div>
-              <p className="text-slate-400 text-[11px] font-bold uppercase tracking-wider">{k.title}</p>
-              <p className="text-2xl font-black text-white mt-1 leading-tight">{k.value}</p>
-              <p className="text-[11px] text-slate-400 mt-1 font-semibold">{k.sub}</p>
-            </div>
-          );
-        })}
+        {kpis.map((k, i) => (
+          <StatCard
+            key={i}
+            title={k.title}
+            value={k.value}
+            change={k.sub}
+            isPositive={true}
+            icon={k.icon}
+            gradient={k.grad}
+            iconBg={k.iconCls}
+            border="border-slate-800"
+          />
+        ))}
       </div>
 
       {/* Jauge d'objectif du mois & Alertes de Stock */}

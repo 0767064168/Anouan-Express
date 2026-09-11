@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { financeAPI } from '../../services/api';
 import { PaymentLogo } from '../../components/ui/PaymentLogos';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -237,19 +238,20 @@ export default function AdminFinancePage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Finance &amp; Reversements</h1>
-          <p className="text-slate-400 text-xs mt-1">Supervision des flux financiers, paiements vendeurs et points de caisse agents.</p>
-        </div>
-        <button
-          onClick={loadData}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors"
-        >
-          <RefreshCcw size={14} /> Actualiser
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Administration Financière"
+        eyebrowIcon={DollarSign}
+        title="Finance & Reversements"
+        subtitle="Supervision des flux financiers, paiements vendeurs et points de caisse agents."
+        actions={(
+          <button
+            onClick={loadData}
+            className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors"
+          >
+            <RefreshCcw size={14} /> Actualiser
+          </button>
+        )}
+      />
 
       {/* Onglets */}
       <div className="flex gap-1 bg-slate-900/60 border border-slate-800 rounded-2xl p-1 w-fit">

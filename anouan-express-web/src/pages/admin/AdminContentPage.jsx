@@ -1,6 +1,7 @@
 // src/pages/admin/AdminContentPage.jsx — Dark Premium Orange
 import React, { useState } from 'react';
 import { Image, Plus, Trash2, Edit, Eye, ToggleLeft, ToggleRight, Package } from 'lucide-react';
+import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_CONTENT = [
   { id: 'C-1', type: 'Bannière Hero',    title: 'Bienvenue sur Anouan Express', visible: true,  updatedAt: '28/08/2026' },
@@ -33,16 +34,17 @@ export default function AdminContentPage() {
 
   return (
     <div className="space-y-6 text-slate-100">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Contenu & Magasin</h1>
-          <p className="text-slate-400 text-xs mt-1">Gérez les sections de contenu et les produits mis en avant.</p>
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">
-          <Plus size={14}/> Nouveau contenu
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Gestion de la Boutique"
+        eyebrowIcon={Image}
+        title="Contenu & Magasin"
+        subtitle="Gérez les sections de contenu et les produits mis en avant."
+        actions={(
+          <button className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">
+            <Plus size={14}/> Nouveau contenu
+          </button>
+        )}
+      />
 
       {/* Tabs */}
       <div className="flex gap-1.5 bg-slate-900/60 border border-slate-800 p-1.5 rounded-2xl w-fit">

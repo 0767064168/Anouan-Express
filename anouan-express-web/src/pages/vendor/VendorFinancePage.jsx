@@ -6,6 +6,7 @@ import { DollarSign, ArrowUpRight, Clock, CheckCircle, Download, Send, Smartphon
 import { financeAPI } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { PaymentLogo } from '../../components/ui/PaymentLogos';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const formatDate = (d) =>
@@ -104,18 +105,20 @@ export default function VendorFinancePage() {
 
   return (
     <div className="space-y-6 bg-slate-950 p-6 min-h-screen">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white">Finance & Versements</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Gérez votre solde et demandez le transfert de vos revenus</p>
-        </div>
-        <button
-          onClick={() => setPayoutModal(true)}
-          className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors"
-        >
-          <Send size={18} /> Demander un versement
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Espace Vendeur"
+        eyebrowIcon={DollarSign}
+        title="Finance & Versements"
+        subtitle="Gérez votre solde et demandez le transfert de vos revenus"
+        actions={(
+          <button
+            onClick={() => setPayoutModal(true)}
+            className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors"
+          >
+            <Send size={18} /> Demander un versement
+          </button>
+        )}
+      />
 
       {success && (
         <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-2xl text-[10px] font-bold flex items-center gap-2">

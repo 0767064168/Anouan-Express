@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ordersAPI, storesAPI, paymentsAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import PaymentLogo from '../../components/ui/PaymentLogos';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -164,7 +165,13 @@ export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-slate-950 py-8 font-sans selection:bg-orange-500 selection:text-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <h1 className="text-3xl text-white font-black mb-8 tracking-tight">Finaliser la commande</h1>
+        <PageHeader
+          eyebrow="Commande sécurisée"
+          eyebrowIcon={ShieldCheck}
+          title="Finaliser la commande"
+          subtitle="Choisissez votre lieu de retrait et votre mode de paiement."
+          className="mb-8"
+        />
 
         {error && (
           <div className="mb-6 p-4 bg-slate-900/60 border border-red-500 text-red-400 rounded-3xl text-xs font-bold flex items-center gap-2">

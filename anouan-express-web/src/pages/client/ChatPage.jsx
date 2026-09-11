@@ -12,6 +12,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import { messagesAPI } from '../../services/api';
 import Emoji from '../../components/ui/Emoji';
+import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_CONVERSATIONS = [
   {
@@ -293,23 +294,19 @@ export default function ChatPage() {
     <div className="flex flex-col h-[calc(100vh-140px)] min-h-[500px] text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950 py-2 gap-3">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex flex-col h-full gap-4">
         
-        {/* Header page */}
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <Link to="/profile" className="p-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div>
-              <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                <MessageSquare size={26} className="text-orange-400" /> Messagerie & Support Live
-              </h1>
-              <p className="text-xs text-slate-300">Échangez en direct avec vos commerçants et l'assistance d'Anouan Express</p>
-            </div>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-xs bg-orange-500/10 border border-orange-500/30 px-4 py-2 rounded-2xl text-orange-400 font-bold">
-            <Sparkles size={14} className="animate-pulse" /> Support Vendeurs 7j/7
-          </div>
-        </div>
+        <PageHeader
+          eyebrow="Support Vendeurs 7j/7"
+          eyebrowIcon={Sparkles}
+          title={(
+            <span className="flex items-center gap-3">
+              <Link to="/profile" className="text-orange-400 hover:text-orange-300 transition-colors" title="Retour au profil">
+                <ArrowLeft size={18} />
+              </Link>
+              <MessageSquare size={24} className="text-orange-400" /> Messagerie & Support Live
+            </span>
+          )}
+          subtitle="Échangez en direct avec vos commerçants et l'assistance d'Anouan Express"
+        />
 
         {/* Panneau Principal Messagerie (Ajustement dynamique fluide) */}
         <div className="glass-panel rounded-3xl border border-slate-800 grid grid-cols-1 lg:grid-cols-12 flex-1 min-h-0 overflow-hidden shadow-2xl">

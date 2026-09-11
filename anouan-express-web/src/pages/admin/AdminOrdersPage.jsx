@@ -1,7 +1,9 @@
 // src/pages/admin/AdminOrdersPage.jsx — Dark Premium Orange
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2 } from 'lucide-react';
+import { RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2 } from 'lucide-react';
 import { ordersAPI, disputesAPI } from '../../services/api';
+import DataToolbar from '../../components/ui/DataToolbar';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
@@ -119,66 +121,40 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="space-y-6 text-slate-100">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Supervision des Commandes</h1>
-          <p className="text-slate-400 text-xs mt-1">
-            {orders.length} commande{orders.length > 1 ? 's' : ''} au total — {filtered.length} affichée{filtered.length > 1 ? 's' : ''}
-          </p>
+      <PageHeader
+        eyebrow="Administration des Commandes"
+        eyebrowIcon={RefreshCcw}
+        title="Supervision des Commandes"
+        subtitle={`${orders.length} commande${orders.length > 1 ? 's' : ''} au total — ${filtered.length} affichée${filtered.length > 1 ? 's' : ''}`}
+        actions={(
+          <button onClick={loadOrders} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors">
+            <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser
+          </button>
+        )}
+      />
+
+      <DataToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Rechercher par ID commande, nom client, téléphone, boutique..."
+        hasActiveFilters={Boolean(statusFilter || search)}
+        onReset={() => { setStatusFilter(''); setSearch(''); }}
+      >
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-slate-500" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-slate-950 border border-slate-800 text-xs text-white rounded-2xl px-4 py-2.5 outline-none focus:border-orange-500 cursor-pointer"
+          >
+            {STATUS_FILTERS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label} ({statusCounts[s.id] || 0})
+              </option>
+            ))}
+          </select>
         </div>
-        <button onClick={loadOrders} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors">
-          <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser
-        </button>
-      </div>
-
-      {/* Filtres & Recherche */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 space-y-3">
-        <div className="flex flex-wrap gap-3 items-center">
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par ID commande, nom client, téléphone, boutique..."
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none transition-all"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Filter size={14} className="text-slate-500" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-800 text-xs text-white rounded-2xl px-4 py-2.5 outline-none focus:border-orange-500 cursor-pointer"
-            >
-              {STATUS_FILTERS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.label} ({statusCounts[s.id] || 0})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {(statusFilter || search) && (
-            <button
-              onClick={() => { setStatusFilter(''); setSearch(''); }}
-              className="px-3 py-2 text-xs text-slate-400 hover:text-orange-400 transition-colors flex items-center gap-1 font-bold"
-            >
-              <X size={13} /> Réinitialiser
-            </button>
-          )}
-        </div>
-
+      </DataToolbar>
         {/* Boutons d'accès direct par statut (Chips cliquables) */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-800/60">
           <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider shrink-0 mr-1">Filtrer par :</span>
@@ -205,7 +181,6 @@ export default function AdminOrdersPage() {
             );
           })}
         </div>
-      </div>
 
       {/* Tableau */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden">

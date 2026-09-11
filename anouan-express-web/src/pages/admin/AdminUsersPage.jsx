@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Search, Filter, UserCheck, UserX, ShieldAlert, Trash2, Eye, Loader2, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
+import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_USERS = [
   { id: 1, name: 'Kouadio Jean-Marc', email: 'jm.kouadio@gmail.com', phone: '+225 07 45 12 88', role: 'client', status: 'active', orders: 12, joined: '12 jan 2026' },
@@ -69,20 +70,20 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-8 animate-fadeIn">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <p className="text-xs text-orange-400 font-bold uppercase tracking-widest mb-1">Administration</p>
-          <h1 className="text-3xl font-black text-white tracking-tight">Gestion des Utilisateurs</h1>
-          <p className="text-slate-400 text-xs mt-1">{stats.total} comptes enregistrés sur la plateforme</p>
-        </div>
-        <button
-          onClick={() => { setLoading(true); setTimeout(() => { setLoading(false); toast.success('Liste rafraîchie.'); }, 600); }}
-          className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Rafraîchir
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Administration"
+        eyebrowIcon={Users}
+        title="Gestion des Utilisateurs"
+        subtitle={`${stats.total} comptes enregistrés sur la plateforme`}
+        actions={(
+          <button
+            onClick={() => { setLoading(true); setTimeout(() => { setLoading(false); toast.success('Liste rafraîchie.'); }, 600); }}
+            className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Rafraîchir
+          </button>
+        )}
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

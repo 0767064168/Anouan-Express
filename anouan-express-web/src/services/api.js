@@ -69,8 +69,8 @@ export const authAPI = {
   verifyOTP: (data) => api.post('/auth/otp/verify', data),
   refresh: (data) => api.post('/auth/refresh', data),
   logout: () => api.post('/auth/logout'),
-  forgotPassword: (data) => api.post('/auth/forgot-password', data),
-  resetPassword: (data) => api.post('/auth/reset-password', data),
+  forgotPassword: (data) => api.post('/auth/password/forgot', data),
+  resetPassword: (data) => api.post('/auth/password/reset', data),
 };
 
 export const usersAPI = {

@@ -1,6 +1,7 @@
 // src/pages/admin/AdminSettingsPage.jsx — Dark Premium Orange
 import React, { useState } from 'react';
 import { Settings, Globe, Bell, Shield, Palette, Save, CheckCircle } from 'lucide-react';
+import PageHeader from '../../components/ui/PageHeader';
 
 const SECTIONS = [
   { key: 'general',     label: 'Général',         icon: Globe },
@@ -50,19 +51,20 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-6 text-slate-100 max-w-4xl">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Paramètres Plateforme</h1>
-          <p className="text-slate-400 text-xs mt-1">Configuration globale de la plateforme Anouan Express.</p>
-        </div>
-        <button onClick={handleSave}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-2xl transition-all ${
-            saved ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20'
-          }`}>
-          {saved ? <><CheckCircle size={14}/> Enregistré !</> : <><Save size={14}/> Sauvegarder</>}
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Configuration Administration"
+        eyebrowIcon={Settings}
+        title="Paramètres Plateforme"
+        subtitle="Configuration globale de la plateforme Anouan Express."
+        actions={(
+          <button onClick={handleSave}
+            className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold rounded-2xl transition-all ${
+              saved ? 'bg-emerald-500/15 border border-emerald-500/30 text-emerald-400' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20'
+            }`}>
+            {saved ? <><CheckCircle size={14}/> Enregistré !</> : <><Save size={14}/> Sauvegarder</>}
+          </button>
+        )}
+      />
 
       <div className="flex gap-6">
         {/* Sidebar */}

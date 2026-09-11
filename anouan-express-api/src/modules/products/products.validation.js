@@ -1,5 +1,16 @@
 const Joi = require('joi');
 
+const requireFlashSalePrice = (value, helpers) => {
+  const isActive = value.flashSaleActive === true || value.flashSaleActive === 'true';
+  const hasPrice = value.flashSalePrice !== undefined && value.flashSalePrice !== null && value.flashSalePrice !== '';
+
+  if (isActive && !hasPrice) {
+    return helpers.message({ custom: 'flashSalePrice is required when flashSaleActive is true' });
+  }
+
+  return value;
+};
+
 const createSchema = Joi.object({
   title: Joi.string().allow(null, '').max(255),
   name: Joi.string().allow(null, '').max(255),
@@ -11,7 +22,7 @@ const createSchema = Joi.object({
   flashSaleActive: Joi.alternatives().try(Joi.boolean(), Joi.string()).default(false),
   flashSalePrice: Joi.alternatives().try(Joi.number().min(0), Joi.string(), Joi.allow(null, '')),
   variants: Joi.alternatives().try(Joi.array(), Joi.string()).default([])
-}).unknown(true);
+}).unknown(true).custom(requireFlashSalePrice);
 
 const updateSchema = Joi.object({
   title: Joi.string().allow(null, '').max(255),

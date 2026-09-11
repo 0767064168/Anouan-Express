@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
   fcm_token    TEXT,          -- Token Firebase pour notifications push
   otp_code     VARCHAR(10),
   otp_expires_at TIMESTAMPTZ,
+  reset_token  VARCHAR(255),
+  reset_token_expires_at TIMESTAMPTZ,
   refresh_token TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -31,6 +33,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_email  ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_phone  ON users(phone);
 CREATE INDEX IF NOT EXISTS idx_users_role   ON users(role);
+CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token);
 
 -- ============================================================
 -- 002 — VENDEURS

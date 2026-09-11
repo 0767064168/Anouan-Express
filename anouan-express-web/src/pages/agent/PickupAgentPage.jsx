@@ -14,6 +14,7 @@ import { pickupAPI } from '../../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../../components/ui/Logo';
 import { PaymentLogo } from '../../components/ui/PaymentLogos';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const cleanPhone = (str) => (str || '').replace(/\D/g, '');
@@ -450,6 +451,13 @@ export default function PickupAgentPage() {
 
       {/* ── Main Container ── */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6 flex flex-col space-y-6">
+
+        <PageHeader
+          eyebrow="Guichet Magasin Central Bouaké"
+          eyebrowIcon={Store}
+          title="Tableau de bord Agent"
+          subtitle={`Bienvenue ${user?.first_name || user?.name || 'Agent'} : gérez les retraits, réceptions et encaissements du magasin.`}
+        />
 
         {/* ── Cartes d'Indicateurs Financiers & Métriques Caisse ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">

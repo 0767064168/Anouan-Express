@@ -184,9 +184,8 @@ const forgotPassword = async ({ email }) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 heure
 
-  // Stocker dans otp_code / otp_expires_at pour simplifier
   await query(
-    'UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3',
+    'UPDATE users SET reset_token = $1, reset_token_expires_at = $2, otp_code = NULL, otp_expires_at = NULL WHERE id = $3',
     [token, expiresAt, result.rows[0].id]
   );
 
@@ -198,18 +197,22 @@ const forgotPassword = async ({ email }) => {
 
 const resetPassword = async ({ token, email, newPassword }) => {
   const result = await query(
-    'SELECT id, otp_code, otp_expires_at FROM users WHERE email = $1',
+    'SELECT id, reset_token, reset_token_expires_at FROM users WHERE email = $1',
     [email]
   );
   if (!result.rows.length) throw new AppError('Lien invalide.', 400, 'INVALID_RESET_TOKEN');
 
   const user = result.rows[0];
-  if (user.otp_code !== token) throw new AppError('Lien invalide.', 400, 'INVALID_RESET_TOKEN');
-  if (new Date() > new Date(user.otp_expires_at)) throw new AppError('Lien expiré.', 400, 'RESET_TOKEN_EXPIRED');
+  if (!user.reset_token || user.reset_token !== token) {
+    throw new AppError('Lien invalide.', 400, 'INVALID_RESET_TOKEN');
+  }
+  if (!user.reset_token_expires_at || new Date() > new Date(user.reset_token_expires_at)) {
+    throw new AppError('Lien expiré.', 400, 'RESET_TOKEN_EXPIRED');
+  }
 
   const passwordHash = await bcrypt.hash(newPassword, env.bcrypt.rounds);
   await query(
-    'UPDATE users SET password_hash = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2',
+    'UPDATE users SET password_hash = $1, reset_token = NULL, reset_token_expires_at = NULL, otp_code = NULL, otp_expires_at = NULL WHERE id = $2',
     [passwordHash, user.id]
   );
 

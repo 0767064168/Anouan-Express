@@ -1,6 +1,7 @@
 // src/pages/admin/AdminMarketingPage.jsx — Dark Premium Orange
 import React, { useEffect, useState } from 'react';
 import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar, Palette, ImagePlus, Pause, Play, Save, Package, Coins, Timer, BarChart3, Settings, BadgePercent } from 'lucide-react';
+import PageHeader from '../../components/ui/PageHeader';
 
 const initialBanners = [
   {
@@ -214,11 +215,12 @@ export default function AdminMarketingPage() {
 
   return (
     <div className="space-y-8 text-slate-100">
-      {/* Header */}
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-black text-white tracking-tight"><Megaphone size={22} className="text-orange-400" /> Marketing & Promotions</h1>
-        <p className="text-slate-400 text-xs mt-1">Gérez les bannières publicitaires avec produit vedette intégré et les ventes flash.</p>
-      </div>
+      <PageHeader
+        eyebrow="Animation Commerciale"
+        eyebrowIcon={Megaphone}
+        title="Marketing & Promotions"
+        subtitle="Gérez les bannières publicitaires avec produit vedette intégré et les ventes flash."
+      />
 
       {/* Bannières */}
       <section>

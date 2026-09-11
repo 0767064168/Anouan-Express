@@ -8,6 +8,7 @@ import {
   ArrowLeft, FileText, Upload, MessageSquare, ChevronRight, AlertCircle
 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
+import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_DISPUTES = [
   {
@@ -105,27 +106,25 @@ export default function DisputesPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950 py-10">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
         
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-3">
-            <Link to="/profile" className="p-2 rounded-2xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors">
-              <ArrowLeft size={18} />
-            </Link>
-            <div>
-              <h1 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
-                <ShieldAlert size={24} className="text-orange-400" /> Réclamations & Service Client
-              </h1>
-              <p className="text-xs text-slate-400">Signalez un problème sur une commande et suivez sa résolution</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-5 py-3 rounded-2xl transition-all shadow-lg shadow-orange-500/20 text-xs uppercase tracking-wider"
-          >
-            <Plus size={16} /> Nouvelle Réclamation
-          </button>
-        </div>
+        <PageHeader
+          title={(
+            <span className="flex items-center gap-2">
+              <Link to="/profile" className="p-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition-colors" title="Retour au profil">
+                <ArrowLeft size={18} />
+              </Link>
+              <ShieldAlert size={24} className="text-orange-400" /> Réclamations & Service Client
+            </span>
+          )}
+          subtitle="Signalez un problème sur une commande et suivez sa résolution"
+          actions={(
+            <button
+              onClick={() => setShowModal(true)}
+              className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black px-5 py-3 rounded-2xl transition-all shadow-lg shadow-orange-500/20 text-xs uppercase tracking-wider"
+            >
+              <Plus size={16} /> Nouvelle Réclamation
+            </button>
+          )}
+        />
 
         {/* Guarantee Banner */}
         <div className="glass-panel rounded-3xl p-5 border border-orange-500/30 bg-orange-500/5 flex items-start gap-4">

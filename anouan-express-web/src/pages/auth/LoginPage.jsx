@@ -8,6 +8,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { authAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import Logo from '../../components/ui/Logo';
+import AuthLayout from '../../components/auth/AuthLayout';
+import AuthAlert from '../../components/auth/AuthAlert';
+import AuthInput from '../../components/auth/AuthInput';
+import AuthPrimaryButton from '../../components/auth/AuthPrimaryButton';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -92,234 +96,179 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 selection:bg-orange-500 selection:text-slate-950">
-      {/* Background pattern */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
-      </div>
+    <AuthLayout
+      logo={<Logo size="xl" to="/" />}
+      footer={
+        <div className="text-center">
+          <p className="text-xs text-slate-400">
+            Pas encore de compte ?{' '}
+            <Link
+              to="/auth/register"
+              className="text-orange-400 font-bold hover:underline"
+            >
+              S&apos;inscrire
+            </Link>
+          </p>
+        </div>
+      }
+    >
+      <div className="p-8">
+        <h1 className="text-2xl font-black text-white mb-1">Bienvenue 👋</h1>
+        <p className="text-slate-400 text-xs mb-6">
+          Connectez-vous à votre compte Anouan Express
+        </p>
 
-      <div className="relative w-full max-w-md">
-        {/* Logo Retouché & Animé */}
-        <div className="flex justify-center mb-8">
-          <Logo size="xl" to="/" />
+        <div className="flex rounded-2xl bg-slate-950 p-1 mb-6 border border-slate-800">
+          <button
+            type="button"
+            onClick={() => { setMode('password'); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              mode === 'password'
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Mail className="w-4 h-4 inline mr-1.5" />
+            Email
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('otp'); setStep(1); setError(''); }}
+            className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
+              mode === 'otp'
+                ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Phone className="w-4 h-4 inline mr-1.5" />
+            SMS OTP
+          </button>
         </div>
 
-        {/* Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden backdrop-blur-xl">
-          <div className="p-8">
-            <h1 className="text-2xl font-black text-white mb-1">Bienvenue 👋</h1>
-            <p className="text-slate-400 text-xs mb-6">
-              Connectez-vous à votre compte Anouan Express
-            </p>
+        {error && <AuthAlert>{error}</AuthAlert>}
 
-            {/* Mode switcher */}
-            <div className="flex rounded-2xl bg-slate-950 p-1 mb-6 border border-slate-800">
-              <button
-                type="button"
-                onClick={() => { setMode('password'); setError(''); }}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                  mode === 'password'
-                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Mail className="w-4 h-4 inline mr-1.5" />
-                Email
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMode('otp'); setStep(1); setError(''); }}
-                className={`flex-1 py-2.5 text-xs font-bold rounded-xl transition-all ${
-                  mode === 'otp'
-                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                <Phone className="w-4 h-4 inline mr-1.5" />
-                SMS OTP
-              </button>
+        {mode === 'password' && (
+          <form onSubmit={handlePasswordLogin} className="space-y-4">
+            <AuthInput
+              id="email"
+              name="email"
+              label="Email"
+              type="email"
+              autoComplete="email"
+              value={form.email}
+              onChange={set('email')}
+              placeholder="votre@email.com"
+              required
+              icon={Mail}
+            />
+
+            <div>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                  Mot de passe
+                </label>
+                <Link
+                  to="/auth/forgot-password"
+                  className="text-xs text-orange-400 hover:underline font-semibold"
+                >
+                  Oublié ?
+                </Link>
+              </div>
+              <AuthInput
+                id="password"
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={form.password}
+                onChange={set('password')}
+                placeholder="••••••••"
+                required
+                icon={Lock}
+                rightSlot={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-slate-500 hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                }
+              />
             </div>
 
-            {/* Erreur */}
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-semibold rounded-2xl">
-                {error}
-              </div>
-            )}
+            <AuthPrimaryButton loading={loading}>
+              <>
+                Se connecter <ArrowRight className="w-5 h-5" />
+              </>
+            </AuthPrimaryButton>
+          </form>
+        )}
 
-            {/* ── Formulaire Email/Mot de passe ── */}
-            {mode === 'password' && (
-              <form onSubmit={handlePasswordLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                    Email
-                  </label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                    <input
-                      id="email"
-                      type="email"
-                      value={form.email}
-                      onChange={set('email')}
-                      required
-                      placeholder="votre@email.com"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-1.5">
-                    <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                      Mot de passe
-                    </label>
-                    <Link
-                      to="/auth/forgot-password"
-                      className="text-xs text-orange-400 hover:underline font-semibold"
-                    >
-                      Oublié ?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                    <input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={form.password}
-                      onChange={set('password')}
-                      required
-                      placeholder="••••••••"
-                      className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-slate-950 font-black py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20 text-sm uppercase tracking-wider"
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      Se connecter <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </button>
+        {mode === 'otp' && (
+          <>
+            {step === 1 && (
+              <form onSubmit={handleSendOTP} className="space-y-4">
+                <AuthInput
+                  id="phone"
+                  name="phone"
+                  label="Numéro de téléphone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={form.phone}
+                  onChange={set('phone')}
+                  placeholder="+225 07 00 00 00 00"
+                  required
+                  icon={Phone}
+                />
+                <AuthPrimaryButton loading={loading}>
+                  <>
+                    Recevoir le code SMS <ArrowRight className="w-5 h-5" />
+                  </>
+                </AuthPrimaryButton>
               </form>
             )}
 
-            {/* ── Formulaire OTP ── */}
-            {mode === 'otp' && (
-              <>
-                {step === 1 && (
-                  <form onSubmit={handleSendOTP} className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                        Numéro de téléphone
-                      </label>
-                      <div className="relative">
-                        <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                        <input
-                          id="phone"
-                          type="tel"
-                          value={form.phone}
-                          onChange={set('phone')}
-                          required
-                          placeholder="+225 07 00 00 00 00"
-                          className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white placeholder-slate-500 focus:border-orange-500 outline-none transition-all"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-slate-950 font-black py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20 text-sm uppercase tracking-wider"
-                    >
-                      {loading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          Recevoir le code SMS <ArrowRight className="w-5 h-5" />
-                        </>
-                      )}
-                    </button>
-                  </form>
-                )}
-
-                {step === 2 && (
-                  <form onSubmit={handleVerifyOTP} className="space-y-4">
-                    <div className="text-center py-2">
-                      <ShieldCheck className="w-10 h-10 text-orange-400 mx-auto mb-2" />
-                      <p className="text-xs text-slate-400">
-                        Code envoyé au <strong className="text-white">{form.phone}</strong>
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">
-                        Code OTP (6 chiffres)
-                      </label>
-                      <input
-                        id="otp"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={6}
-                        value={form.otp}
-                        onChange={set('otp')}
-                        required
-                        placeholder="123456"
-                        className="w-full text-center text-2xl font-mono font-bold tracking-[0.3em] py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white focus:border-orange-500 outline-none transition-all"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-60 text-slate-950 font-black py-3.5 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-orange-500/20 text-sm uppercase tracking-wider"
-                    >
-                      {loading ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <>
-                          Valider <ArrowRight className="w-5 h-5" />
-                        </>
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setStep(1); setForm(f => ({ ...f, otp: '' })); }}
-                      className="w-full text-xs font-semibold text-slate-400 hover:text-white py-2 transition-colors"
-                    >
-                      ← Modifier le numéro
-                    </button>
-                  </form>
-                )}
-              </>
+            {step === 2 && (
+              <form onSubmit={handleVerifyOTP} className="space-y-4">
+                <div className="text-center py-2">
+                  <ShieldCheck className="w-10 h-10 text-orange-400 mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">
+                    Code envoyé au <strong className="text-white">{form.phone}</strong>
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 text-center">
+                    Code OTP (6 chiffres)
+                  </label>
+                  <input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={form.otp}
+                    onChange={set('otp')}
+                    required
+                    placeholder="123456"
+                    className="w-full text-center text-2xl font-mono font-bold tracking-[0.3em] py-3 bg-slate-950 border border-slate-800 rounded-2xl text-white focus:border-orange-500 outline-none transition-all"
+                  />
+                </div>
+                <AuthPrimaryButton loading={loading}>
+                  <>
+                    Valider <ArrowRight className="w-5 h-5" />
+                  </>
+                </AuthPrimaryButton>
+                <button
+                  type="button"
+                  onClick={() => { setStep(1); setForm(f => ({ ...f, otp: '' })); }}
+                  className="w-full text-xs font-semibold text-slate-400 hover:text-white py-2 transition-colors"
+                >
+                  ← Modifier le numéro
+                </button>
+              </form>
             )}
-          </div>
-
-          {/* Footer de la card */}
-          <div className="px-8 py-4 bg-slate-950/60 border-t border-slate-800 text-center">
-            <p className="text-xs text-slate-400">
-              Pas encore de compte ?{' '}
-              <Link
-                to="/auth/register"
-                className="text-orange-400 font-bold hover:underline"
-              >
-                S&apos;inscrire
-              </Link>
-            </p>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }

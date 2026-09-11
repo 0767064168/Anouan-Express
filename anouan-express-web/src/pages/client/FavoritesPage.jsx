@@ -7,6 +7,7 @@ import { Heart, ShoppingCart, Trash2, Star, Sparkles, LayoutGrid } from 'lucide-
 import { useFavorites } from '../../contexts/FavoritesContext';
 import { useCart } from '../../contexts/CartContext';
 import { useToast } from '../../components/ui/Toast';
+import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -29,21 +30,19 @@ export default function FavoritesPage() {
     <div className="min-h-screen bg-slate-950 py-10 text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-black text-white tracking-tight">Mes Favoris</h1>
+        <PageHeader
+          title={
+            <span className="flex items-center gap-3">
+              Mes Favoris
               {count > 0 && (
                 <span className="bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-black px-2.5 py-1 rounded-full">
                   {count} article{count > 1 ? 's' : ''}
                 </span>
               )}
-            </div>
-            <p className="text-xs text-slate-400">Vos produits sauvegardés pour plus tard</p>
-          </div>
-
-          {count > 0 && (
+            </span>
+          }
+          subtitle="Vos produits sauvegardés pour plus tard"
+          actions={count > 0 && (
             <button
               onClick={() => { clearFavorites(); toast.info('Liste de favoris vidée.'); }}
               className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-2.5 rounded-2xl transition-all"
@@ -51,7 +50,7 @@ export default function FavoritesPage() {
               <Trash2 size={14} /> Tout supprimer
             </button>
           )}
-        </div>
+        />
 
         {/* Contenu */}
         {count === 0 ? (

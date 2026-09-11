@@ -9,6 +9,7 @@ import { ordersAPI, pickupAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import InvoiceModal from '../../components/client/InvoiceModal';
+import PageHeader from '../../components/ui/PageHeader';
 
 export default function OrderTrackingPage() {
   const { id: orderId } = useParams();
@@ -130,31 +131,32 @@ export default function OrderTrackingPage() {
   return (
     <div className="min-h-screen bg-slate-950 py-10 text-slate-100 font-sans selection:bg-orange-500 selection:text-slate-950">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        {/* Fil d'Ariane & Actions */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-6">
-          <div>
-            <Link to="/profile" className="text-xs text-orange-400 font-bold hover:underline flex items-center gap-1.5 mb-2">
-              <ArrowLeft size={14} /> Retour à mes commandes
-            </Link>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-black text-white tracking-tight">Suivi de Commande</h1>
+        <PageHeader
+          title={(
+            <span className="flex items-center gap-3">
+              <Link to="/profile" className="text-orange-400 hover:text-orange-300 transition-colors" title="Retour à mes commandes">
+                <ArrowLeft size={18} />
+              </Link>
+              Suivi de Commande
               {isLiveConnected && (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black rounded-full animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" /> EN DIRECT
                 </span>
               )}
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Commande n° <span className="font-mono font-bold text-orange-400">#{order?.id}</span>
-            </p>
-          </div>
-          <button
-            onClick={() => setShowInvoiceModal(true)}
-            className="flex items-center gap-2 text-slate-200 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs font-bold hover:border-orange-500/40 transition-colors shadow-lg"
-          >
-            <Download size={15} className="text-orange-400" /> Facture PDF & Reçu
-          </button>
-        </div>
+            </span>
+          )}
+          subtitle={(
+            <>Commande n° <span className="font-mono font-bold text-orange-400">#{order?.id}</span></>
+          )}
+          actions={(
+            <button
+              onClick={() => setShowInvoiceModal(true)}
+              className="flex items-center gap-2 text-slate-200 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs font-bold hover:border-orange-500/40 transition-colors shadow-lg"
+            >
+              <Download size={15} className="text-orange-400" /> Facture PDF & Reçu
+            </button>
+          )}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Colonne Principale */}

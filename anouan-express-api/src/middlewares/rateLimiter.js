@@ -40,6 +40,24 @@ const authLimiter = rateLimit({
 });
 
 /**
+ * Limiteur dédié au flux de mot de passe oublié / réinitialisation
+ * protège les demandes répétées d’envoi de lien et les tentatives de reset
+ */
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: {
+      code: 'PASSWORD_RESET_RATE_LIMIT',
+      message: 'Trop de demandes de réinitialisation. Réessayez dans 15 minutes.',
+    },
+  },
+});
+
+/**
  * Limiteur pour la validation du code de retrait
  */
 const pickupLimiter = rateLimit({
@@ -73,4 +91,4 @@ const paymentLimiter = rateLimit({
   },
 });
 
-module.exports = { globalLimiter, authLimiter, pickupLimiter, paymentLimiter };
+module.exports = { globalLimiter, authLimiter, passwordResetLimiter, pickupLimiter, paymentLimiter };
