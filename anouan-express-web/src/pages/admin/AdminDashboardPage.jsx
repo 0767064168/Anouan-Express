@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer
+  Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { adminAPI, financeAPI, ordersAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
@@ -64,7 +64,72 @@ const AdminRevenueChart = ({ data }) => (
     </AreaChart>
   </ResponsiveContainer>
 );
+const PIE_STATUS_COLORS = {
+  pending: '#f59e0b',
+  confirmed: '#3b82f6',
+  preparing: '#60a5fa',
+  ready_for_pickup: '#a855f7',
+  picked_up: '#10b981',
+  delivered: '#10b981',
+  cancelled: '#ef4444',
+  created: '#94a3b8',
+};
 
+const PIE_STATUS_LABELS = {
+  pending: 'En attente',
+  confirmed: 'Confirmée',
+  preparing: 'En cours',
+  ready_for_pickup: 'Au relais',
+  picked_up: 'Récupérée',
+  delivered: 'Livrée',
+  cancelled: 'Annulée',
+  created: 'Créée',
+};
+
+const AdminOrderStatusPieChart = ({ data }) => {
+  const chartData = (data || []).filter((d) => d.count > 0).map((d) => ({
+    name: PIE_STATUS_LABELS[d.status] || d.status,
+    value: Number(d.count || 0),
+    color: PIE_STATUS_COLORS[d.status] || '#f97316',
+  }));
+
+  if (!chartData.length) {
+    return (
+      <div className="h-[220px] flex items-center justify-center rounded-2xl border border-dashed border-slate-800 text-xs text-slate-500">
+        Aucune commande enregistrée pour le moment.
+      </div>
+    );
+  }
+
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <PieChart>
+        <Pie
+          data={chartData}
+          cx="50%"
+          cy="50%"
+          innerRadius={50}
+          outerRadius={75}
+          paddingAngle={3}
+          dataKey="value"
+        >
+          {chartData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={entry.color} stroke="#0f172a" strokeWidth={2} />
+          ))}
+        </Pie>
+        <Tooltip
+          formatter={(value, name) => [`${value} commandes`, name]}
+          contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '1rem', fontSize: '11px', color: '#fff' }}
+        />
+        <Legend
+          verticalAlign="bottom"
+          height={36}
+          formatter={(value) => <span className="text-[10px] text-slate-300 font-bold">{value}</span>}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  );
+};
 export default function AdminDashboardPage() {
   const toast = useToast();
   const [statsData, setStatsData] = useState({
@@ -151,8 +216,9 @@ export default function AdminDashboardPage() {
 
   const statCards = [
     {
-      title: "Chiffre d'Affaires du jour",
+      title: "Chiffre d'Affaires Global",
       value: formatPrice(statsData.totalRevenue),
+      change: statsData.todayRevenue ? `+${formatPrice(statsData.todayRevenue)} ajd` : null,
       isPositive: true,
       icon: DollarSign,
       gradient: 'from-orange-500/20 to-amber-500/10',
@@ -160,8 +226,19 @@ export default function AdminDashboardPage() {
       border: 'border-orange-500/30',
     },
     {
-      title: "Commandes du Jour",
-      value: statsData.todayOrders,
+      title: "CA du Mois en Cours",
+      value: formatPrice(statsData.thisMonthRevenue || 0),
+      change: `${statsData.thisMonthOrders || 0} cmd ce mois`,
+      isPositive: true,
+      icon: TrendingUp,
+      gradient: 'from-amber-500/20 to-orange-500/10',
+      iconBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      border: 'border-amber-500/30',
+    },
+    {
+      title: "Commandes Enregistrées",
+      value: `${statsData.totalOrders || 0}`,
+      change: `${statsData.todayOrders || 0} aujourd'hui`,
       isPositive: true,
       icon: ShoppingCart,
       gradient: 'from-blue-500/20 to-cyan-500/10',
@@ -169,22 +246,33 @@ export default function AdminDashboardPage() {
       border: 'border-blue-500/30',
     },
     {
-      title: "Boutiques Partenaires",
-      value: statsData.activeVendors,
-      isPositive: true,
-      icon: Store,
+      title: "En Préparation / Relais",
+      value: `${statsData.pendingOrders || 0}`,
+      change: statsData.cancelledToday ? `${statsData.cancelledToday} annulée(s)` : 'Flux actif',
+      isPositive: (statsData.pendingOrders || 0) > 0,
+      icon: Clock,
       gradient: 'from-purple-500/20 to-violet-500/10',
       iconBg: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
       border: 'border-purple-500/30',
     },
     {
-      title: "Taux de Retrait 24h",
-      value: statsData.pickupRate,
+      title: "Clients Inscrits",
+      value: statsData.totalClients || 0,
+      change: statsData.newClientsThisMonth || statsData.newUsersThisMonth ? `+${statsData.newClientsThisMonth || statsData.newUsersThisMonth} ce mois` : null,
       isPositive: true,
-      icon: PackageCheck,
+      icon: Users,
       gradient: 'from-emerald-500/20 to-teal-500/10',
       iconBg: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
       border: 'border-emerald-500/30',
+    },
+    {
+      title: "Taux de Retrait",
+      value: statsData.pickupRate || '0.0%',
+      isPositive: true,
+      icon: PackageCheck,
+      gradient: 'from-amber-500/20 to-yellow-500/10',
+      iconBg: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+      border: 'border-amber-500/30',
     },
   ];
 
@@ -195,7 +283,16 @@ export default function AdminDashboardPage() {
         eyebrow="Console d'Administration Live"
         eyebrowIcon={Activity}
         title="Vue d'Ensemble Anouan Express"
-        subtitle="Supervision des ventes, retraits au magasin central et activités vendeurs à Bouaké"
+        subtitle={(
+          <span className="flex flex-wrap items-center gap-3">
+            <span>Supervision des ventes, retraits au magasin central et activités vendeurs à Bouaké</span>
+            {statsData.liveConnections > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black rounded-full animate-pulse">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" /> {statsData.liveConnections} en ligne
+              </span>
+            )}
+          </span>
+        )}
         actions={
           <>
             <Link
@@ -220,7 +317,7 @@ export default function AdminDashboardPage() {
         }
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {statCards.map((stat, i) => (
           <StatCard
             key={i}
@@ -307,6 +404,23 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
+      {/* Graphique de Répartition des Commandes par Statut */}
+      <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h2 className="text-base font-black text-white flex items-center gap-2">
+              <PackageCheck size={18} className="text-orange-400" /> Répartition du Flux des Commandes
+            </h2>
+            <p className="text-xs text-slate-400">Statut en temps réel des commandes dans le réseau Bouaké</p>
+          </div>
+          <div className="text-xs font-bold text-slate-400">
+            Total actif : <span className="text-white font-black">{statsData.pendingOrders || 0} commandes en cours</span>
+          </div>
+        </div>
+
+        <AdminOrderStatusPieChart data={statsData.ordersByStatus || statsData.orderStatuses || []} />
+      </div>
+
       {/* Section Commandes Récentes & Top Vendeurs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -359,48 +473,78 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* Top Vendeurs (1 col) */}
-        <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-5">
-          <div>
-            <h2 className="text-sm font-black text-white">Top Vendeurs à Bouaké</h2>
-            <p className="text-[11px] text-slate-400 mt-0.5">Boutiques les plus performantes ce mois</p>
-          </div>
+        {/* Top Vendeurs & Top Produits (1 col) */}
+        <div className="space-y-6">
+          <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-5">
+            <div>
+              <h2 className="text-sm font-black text-white">Top Vendeurs à Bouaké</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Boutiques les plus performantes ce mois</p>
+            </div>
 
-          <div className="space-y-4">
-            {topVendors.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
-                Les performances vendeurs seront disponibles après synchronisation.
-              </div>
-            ) : topVendors.map((vendor, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${
-                  i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  : i === 1 ? 'bg-slate-400/10 text-slate-400 border border-slate-700'
-                  : 'bg-slate-800/50 text-slate-500 border border-slate-800'
-                }`}>
-                  #{i + 1}
+            <div className="space-y-4">
+              {topVendors.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                  Les performances vendeurs seront disponibles après synchronisation.
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-white truncate">{vendor.name}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">{vendor.orders.toLocaleString()} ventes • ⭐ {vendor.rating}</div>
-                  <div className="mt-1.5 h-1 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
-                      style={{ width: `${Math.round((vendor.orders / 1420) * 100)}%` }}
-                    />
+              ) : topVendors.map((vendor, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-[10px] font-black shrink-0 ${
+                    i === 0 ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : i === 1 ? 'bg-slate-400/10 text-slate-400 border border-slate-700'
+                    : 'bg-slate-800/50 text-slate-500 border border-slate-800'
+                  }`}>
+                    #{i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-white truncate">{vendor.name}</div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{vendor.orders.toLocaleString()} ventes • ⭐ {vendor.rating}</div>
+                    <div className="mt-1.5 h-1 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-orange-500 to-amber-500 rounded-full"
+                        style={{ width: `${Math.min(100, Math.round((vendor.orders / Math.max(1, topVendors[0]?.orders || 1)) * 100))}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-                <span className="text-[10px] font-black text-emerald-400 shrink-0">{vendor.trend}</span>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            <Link
+              to="/admin/vendors"
+              className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold rounded-2xl border border-slate-800 transition-all"
+            >
+              Voir toutes les boutiques <ChevronRight size={14} />
+            </Link>
           </div>
 
-          <Link
-            to="/admin/vendors"
-            className="flex items-center justify-center gap-2 w-full py-2.5 mt-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-bold rounded-2xl border border-slate-800 transition-all"
-          >
-            Voir toutes les boutiques <ChevronRight size={14} />
-          </Link>
+          {/* Top 5 Produits les Plus Vendus */}
+          <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-5">
+            <div>
+              <h2 className="text-sm font-black text-white">Top 5 Meilleures Ventes</h2>
+              <p className="text-[11px] text-slate-400 mt-0.5">Articles phares sur Anouan Express</p>
+            </div>
+
+            <div className="space-y-3">
+              {(statsData.topProducts || []).length === 0 ? (
+                <div className="py-6 text-center text-xs text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                  Les meilleures ventes apparaîtront au fil des commandes.
+                </div>
+              ) : statsData.topProducts.map((prod, idx) => (
+                <div key={idx} className="flex items-center justify-between text-xs p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-6 h-6 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-[10px] flex items-center justify-center shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-bold text-white truncate max-w-[140px]">{prod.name}</span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-orange-400 font-bold">{prod.sales} ventes</span>
+                    <p className="text-[10px] text-slate-500">{formatPrice(prod.revenue)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

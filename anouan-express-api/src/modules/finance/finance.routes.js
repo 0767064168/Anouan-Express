@@ -10,6 +10,7 @@ const { createPayoutSchema, requestVendorPayoutSchema, dateRangeSchema, payoutId
 // Vendor routes
 router.get('/vendor/stats', authenticate, authorize('vendor'), validate({ query: dateRangeSchema }), financeController.getVendorStats);
 router.get('/vendor/payouts', authenticate, authorize('vendor'), financeController.getVendorPayouts);
+router.get('/vendor/history', authenticate, authorize('vendor'), financeController.getVendorPayouts);
 router.post('/vendor/payout', authenticate, authorize('vendor'), validate({ body: requestVendorPayoutSchema }), financeController.requestVendorPayout);
 
 // Admin routes

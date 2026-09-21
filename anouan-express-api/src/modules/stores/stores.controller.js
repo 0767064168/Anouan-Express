@@ -46,3 +46,12 @@ exports.toggleActive = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.delete = async (req, res, next) => {
+  try {
+    const store = await storesService.delete(req.params.id);
+    res.json({ success: true, message: 'Point relais supprimé avec succès.', data: store });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -22,6 +22,20 @@ describe('csrfProtection', () => {
     expect(next.mock.calls[0][0]).toMatchObject({ code: 'CSRF_TOKEN_MISSING', statusCode: 403 });
   });
 
+  it('allows login requests even when a stale access token cookie exists', () => {
+    const req = {
+      method: 'POST',
+      path: '/api/auth/login',
+      cookies: { accessToken: 'stale-token' },
+      get: jest.fn(() => undefined),
+    };
+    const next = jest.fn();
+
+    csrfProtection(req, {}, next);
+
+    expect(next).toHaveBeenCalledWith();
+  });
+
   it('allows a matching CSRF cookie and header', () => {
     const token = createCsrfToken();
     const next = run({ cookies: { accessToken: 'access-token', csrfToken: token }, header: token });

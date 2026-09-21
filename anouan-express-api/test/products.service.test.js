@@ -72,3 +72,24 @@ describe('products.service.create', () => {
     expect(variantInsertCalled).toBe(true);
   });
 });
+
+describe('products.service.getVendorProducts', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('filters the list by the authenticated vendor id', async () => {
+    db.query
+      .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await productsService.getVendorProducts('vendor-new', 1, 100);
+
+    expect(result.data).toEqual([]);
+    expect(result.pagination.total).toBe(0);
+    expect(db.query.mock.calls[0][0]).toContain('p.vendor_id = $1');
+    expect(db.query.mock.calls[0][1]).toEqual(['vendor-new', 100, 0]);
+    expect(db.query.mock.calls[1][0]).toContain('p.vendor_id = $1');
+    expect(db.query.mock.calls[1][1]).toEqual(['vendor-new', 100, 0]);
+  });
+});

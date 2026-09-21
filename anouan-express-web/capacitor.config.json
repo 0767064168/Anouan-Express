@@ -1,5 +1,8 @@
 {
   "appId": "com.anouanexpress.app",
   "appName": "Anouan Express",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  }
 }

@@ -3,12 +3,16 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, ShieldCheck, MapPin, Heart, Share2, Minus, Plus, ShoppingCart, CheckCircle, MessageSquare, Loader2, Award, Truck, RefreshCw, Zap, Sparkles, Send, User, Store } from 'lucide-react';
+import { Star, ShieldCheck, MapPin, Heart, Share2, Minus, Plus, ShoppingCart, CheckCircle, MessageSquare, Loader2, Award, Truck, RefreshCw, Zap, Sparkles, Send, User, Store, Camera, X } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useFavorites } from '../../contexts/FavoritesContext';
 import { productsAPI, reviewsAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import { getFallbackProductImage, isValidImageUrl } from '../../contexts/ProductContext';
+import { compressImage } from '../../utils/imageCompressor';
+import { useRecentlyViewed } from '../../hooks/useRecentlyViewed';
+import RecentlyViewed from '../../components/client/RecentlyViewed';
+import FlashSaleCountdown from '../../components/client/FlashSaleCountdown';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -22,6 +26,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const { addItem } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { addRecentlyViewed } = useRecentlyViewed();
   const toast = useToast();
 
   const [product, setProduct] = useState(null);
@@ -38,6 +43,8 @@ export default function ProductDetailPage() {
   const [newReviewName, setNewReviewName] = useState('');
   const [newReviewComment, setNewReviewComment] = useState('');
   const [newReviewRating, setNewReviewRating] = useState(5);
+  const [reviewPhotos, setReviewPhotos] = useState([]);
+  const [selectedReviewImage, setSelectedReviewImage] = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
@@ -168,9 +175,32 @@ const MOCK_PRODUCTS_MAP = {
     setProduct(targetProduct);
     setGallery(productImages);
     setActiveImage(0);
+    addRecentlyViewed(targetProduct);
 
     // 🏬 Charger les offres des autres boutiques pour le même modèle
     await loadOtherStoresProducts(targetProduct);
+
+    // 🌟 Charger les avis réels depuis l'API backend
+    try {
+      const revRes = await reviewsAPI.getProductReviews(id).catch(() => null);
+      const apiReviews = revRes?.data?.data || revRes?.data;
+      if (Array.isArray(apiReviews) && apiReviews.length > 0) {
+        const mapped = apiReviews.map((r) => ({
+          id: r.id,
+          name: r.client_name || 'Client Anouan Express',
+          rating: r.rating || 5,
+          date: r.created_at
+            ? new Date(r.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+            : 'Récemment',
+          comment: r.comment || '',
+          images: Array.isArray(r.images) ? r.images : [],
+        }));
+        setReviews(mapped);
+      }
+    } catch (e) {
+      console.warn('Reviews fetch fallback:', e?.message);
+    }
+
     setLoading(false);
   };
 
@@ -181,28 +211,68 @@ const MOCK_PRODUCTS_MAP = {
     toast.success('Produit ajouté au panier avec succès !');
   };
 
-  const handleSubmitReview = (e) => {
+  const handlePhotoUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (reviewPhotos.length + files.length > 3) {
+      toast.error('Vous pouvez ajouter jusqu\'à 3 photos maximum.');
+      return;
+    }
+    const newPhotos = [];
+    for (const f of files) {
+      try {
+        const compressed = await compressImage(f);
+        newPhotos.push({
+          file: compressed,
+          previewUrl: URL.createObjectURL(compressed),
+        });
+      } catch {
+        newPhotos.push({
+          file: f,
+          previewUrl: URL.createObjectURL(f),
+        });
+      }
+    }
+    setReviewPhotos((prev) => [...prev, ...newPhotos]);
+  };
+
+  const removePhoto = (index) => {
+    setReviewPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!newReviewComment.trim()) {
       toast.error('Veuillez saisir un commentaire.');
       return;
     }
     setSubmittingReview(true);
-    setTimeout(() => {
-      const rev = {
-        id: Date.now(),
-        name: newReviewName.trim() || 'Acheteur Vérifié',
+    try {
+      await reviewsAPI.submit({
+        productId: String(id),
         rating: newReviewRating,
-        date: 'Aujourd\'hui',
         comment: newReviewComment.trim(),
-      };
-      setReviews([rev, ...reviews]);
-      setNewReviewComment('');
-      setNewReviewName('');
-      setNewReviewRating(5);
-      setSubmittingReview(false);
-      toast.success('Merci ! Votre avis a été publié avec succès.');
-    }, 600);
+        images: reviewPhotos.map((p) => p.previewUrl),
+      });
+    } catch (err) {
+      console.warn('reviewsAPI.submit fallback:', err?.message);
+    }
+
+    const rev = {
+      id: Date.now(),
+      name: newReviewName.trim() || 'Acheteur Vérifié',
+      rating: newReviewRating,
+      date: 'Aujourd\'hui',
+      comment: newReviewComment.trim(),
+      images: reviewPhotos.map((p) => p.previewUrl),
+    };
+    setReviews([rev, ...reviews]);
+    setNewReviewComment('');
+    setNewReviewName('');
+    setNewReviewRating(5);
+    setReviewPhotos([]);
+    setSubmittingReview(false);
+    toast.success('Merci ! Votre avis a été publié avec succès.');
   };
 
   if (loading) {
@@ -339,11 +409,21 @@ const MOCK_PRODUCTS_MAP = {
                   </span>
                 </div>
 
-                {/* Prix */}
-                <div className="flex items-baseline gap-3 pt-2">
+                {/* Prix & Remise */}
+                <div className="flex flex-wrap items-center gap-3 pt-2">
                   <span className="text-3xl lg:text-4xl font-black text-orange-400">{formatPrice(product.price)}</span>
-                  {product.old_price && (
-                    <span className="text-base text-slate-500 line-through font-semibold">{formatPrice(product.old_price)}</span>
+                  {(product.old_price || product.oldPrice) && Number(product.old_price || product.oldPrice) > Number(product.price) && (
+                    <>
+                      <span className="text-base text-slate-500 line-through font-semibold">
+                        {formatPrice(product.old_price || product.oldPrice)}
+                      </span>
+                      <span className="bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-full shadow-md uppercase tracking-wider">
+                        -{Math.round(((Number(product.old_price || product.oldPrice) - Number(product.price)) / Number(product.old_price || product.oldPrice)) * 100)}%
+                      </span>
+                    </>
+                  )}
+                  {(product.flash_sale_active || product.flash_sale) && (
+                    <FlashSaleCountdown compact />
                   )}
                 </div>
 
@@ -428,6 +508,50 @@ const MOCK_PRODUCTS_MAP = {
                   <MessageSquare size={16} className="text-orange-400" />
                   Poser une question à la boutique
                 </Link>
+
+                {/* Partage WhatsApp & Commerce Social */}
+                <div className="flex gap-2 flex-wrap">
+                  {/* Partager le produit sur WhatsApp */}
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(`🛒 ${product.name || product.title} à ${formatPrice(product.price)} sur Anouan Express Bouaké.\nRetrait sécurisé en magasin. Voir ici : ${window.location.href}`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 min-w-[140px] py-3 px-4 bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-400 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                    title="Partager ce produit sur WhatsApp"
+                  >
+                    <Share2 size={15} />
+                    Partager sur WhatsApp
+                  </a>
+
+                  {/* Contacter le vendeur directement sur WhatsApp */}
+                  {(product.vendor_phone || product.store_phone) && (
+                    <a
+                      href={`https://api.whatsapp.com/send?phone=${encodeURIComponent((product.vendor_phone || product.store_phone || '').replace(/\s/g, ''))}&text=${encodeURIComponent(`Bonjour, je suis intéressé(e) par "${product.name || product.title}" à ${formatPrice(product.price)} sur Anouan Express. Pouvez-vous me donner plus d'informations ?`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 min-w-[140px] py-3 px-4 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/20 hover:border-emerald-500/50 text-emerald-300 rounded-2xl flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                      title="Discuter avec le vendeur sur WhatsApp"
+                    >
+                      <MessageSquare size={15} className="text-emerald-400" />
+                      Vendeur WhatsApp
+                    </a>
+                  )}
+
+                  {/* Copier le lien */}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(window.location.href).then(() => {
+                        const btn = document.getElementById('copy-link-btn');
+                        if (btn) { btn.textContent = '✓ Copié !'; setTimeout(() => { btn.textContent = 'Copier lien'; }, 2000); }
+                      });
+                    }}
+                    className="py-3 px-4 bg-slate-900/80 hover:bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-300 hover:text-white rounded-2xl flex items-center justify-center gap-2 text-xs font-bold transition-all"
+                    title="Copier le lien de ce produit"
+                  >
+                    <Share2 size={15} className="text-slate-400" />
+                    <span id="copy-link-btn">Copier lien</span>
+                  </button>
+                </div>
 
                 {/* Badges de Réassurance */}
                 <div className="grid grid-cols-2 gap-3 pt-2">
@@ -514,6 +638,40 @@ const MOCK_PRODUCTS_MAP = {
                   />
                 </div>
 
+                {/* Upload Photos d'avis client */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                    Photos de l'article (max 3)
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {reviewPhotos.map((photo, idx) => (
+                      <div key={idx} className="relative w-14 h-14 rounded-2xl overflow-hidden border border-orange-500/40 group">
+                        <img src={photo.previewUrl} alt="Aperçu" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(idx)}
+                          className="absolute inset-0 bg-black/60 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={16} className="text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                    {reviewPhotos.length < 3 && (
+                      <label className="w-14 h-14 rounded-2xl border-2 border-dashed border-slate-800 hover:border-orange-500/50 flex flex-col items-center justify-center cursor-pointer transition-colors text-slate-500 hover:text-orange-400">
+                        <Camera size={18} />
+                        <span className="text-[9px] font-bold mt-0.5">+Photo</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={submittingReview}
@@ -550,6 +708,22 @@ const MOCK_PRODUCTS_MAP = {
                   </div>
 
                   <p className="text-slate-300 text-xs leading-relaxed pt-1">{rev.comment}</p>
+
+                  {/* Galerie Photos de l'Avis */}
+                  {rev.images && rev.images.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {rev.images.map((img, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setSelectedReviewImage(img)}
+                          className="w-16 h-16 rounded-xl overflow-hidden border border-slate-800 hover:border-orange-500/50 transition-all hover:scale-105"
+                        >
+                          <img src={img} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -614,6 +788,9 @@ const MOCK_PRODUCTS_MAP = {
           )}
         </div>
 
+        {/* Section Articles Récemment Consultés */}
+        <RecentlyViewed currentProductId={product?.id} />
+
       </div>
 
       {/* Barre Sticky d'Achat Rapide Mobile (visible uniquement < lg) */}
@@ -629,6 +806,28 @@ const MOCK_PRODUCTS_MAP = {
           <ShoppingCart size={16} /> Ajouter
         </button>
       </div>
+
+      {/* Lightbox Zoom Photo Avis */}
+      {selectedReviewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setSelectedReviewImage(null)}
+        >
+          <div className="relative max-w-2xl max-h-[85vh]">
+            <img
+              src={selectedReviewImage}
+              alt="Avis photo zoom"
+              className="max-w-full max-h-[85vh] rounded-3xl object-contain border border-slate-700 shadow-2xl"
+            />
+            <button
+              onClick={() => setSelectedReviewImage(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-slate-900 border border-slate-700 text-white flex items-center justify-center hover:bg-orange-500 transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

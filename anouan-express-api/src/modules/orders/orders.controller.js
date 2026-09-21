@@ -36,6 +36,12 @@ exports.getVendorOrders = async (req, res, next) => {
 exports.getAllOrders = async (req, res, next) => {
   try {
     const { page, limit, ...filters } = req.query;
+    if (req.user.role === 'agent') {
+      filters.storeId = req.user.store_id;
+      if (!filters.storeId) {
+        return res.status(403).json({ success: false, message: 'Votre compte Agent n’est pas affecté à un point relais.', code: 'AGENT_STORE_REQUIRED' });
+      }
+    }
     const result = await ordersService.getAllOrders(parseInt(page || 1, 10), parseInt(limit || 20, 10), filters);
     res.json({ success: true, ...result });
   } catch (err) {
@@ -97,6 +103,24 @@ exports.getDeliverySlipPDF = async (req, res, next) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename=delivery_slip_${req.params.id}.pdf`);
     res.send(pdfBuffer);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getMyStats = async (req, res, next) => {
+  try {
+    const stats = await ordersService.getMyStats(req.user.id);
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.setDelegate = async (req, res, next) => {
+  try {
+    const updated = await ordersService.setDelegate(req.params.id, req.user.id, req.body);
+    res.json({ success: true, data: updated });
   } catch (err) {
     next(err);
   }

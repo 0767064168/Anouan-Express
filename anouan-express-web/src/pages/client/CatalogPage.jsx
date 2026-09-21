@@ -1,20 +1,22 @@
 // src/pages/client/CatalogPage.jsx
 // Page Catalogue des produits avec Thème Culturel Ivoirien & Pagne Kita (Dark Glassmorphism)
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Search, Filter, ShoppingCart, Star, SlidersHorizontal, ArrowRight, Loader2, Sparkles, Award, Heart, X, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router-dom';
+import { Search, Filter, ShoppingCart, Star, SlidersHorizontal, ArrowRight, Loader2, Sparkles, Award, Heart, X, ShieldCheck, Check, Zap, Store, Tag } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../../services/api';
 import { useCart } from '../../contexts/CartContext';
 import { useFavorites } from '../../contexts/FavoritesContext';
 import { useProducts, getFallbackProductImage, isValidImageUrl } from '../../contexts/ProductContext';
 import { useToast } from '../../components/ui/Toast';
+import FlashSaleCountdown from '../../components/client/FlashSaleCountdown';
 
 const formatPrice = (p) => typeof p === 'number' ? new Intl.NumberFormat('fr-CI').format(p) + ' FCFA' : p;
 
 export default function CatalogPage() {
   const { categorySlug } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const searchQ = searchParams.get('q') || '';
   const { addItem } = useCart();
   const { toggleFavorite, isFavorite } = useFavorites();
@@ -31,9 +33,15 @@ export default function CatalogPage() {
   ]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState(() => searchParams.get('category') || categorySlug || '');
+  const [searchInput, setSearchInput] = useState(searchQ);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [sortBy, setSortBy] = useState('newest');
+  const [minPrice, setMinPrice] = useState(0);
   const [maxPrice, setMaxPrice] = useState(500000);
+  const [inStockOnly, setInStockOnly] = useState(false);
+  const [onSaleOnly, setOnSaleOnly] = useState(false);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const searchContainerRef = useRef(null);
 
   // Synchronise la catégorie avec l'URL en direct
   useEffect(() => {
@@ -61,39 +69,108 @@ export default function CatalogPage() {
     loadCategories();
   }, []);
 
+  // Fermer les suggestions au clic en dehors
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Calcul des suggestions instantanées (produits, boutiques, catégories)
+  const suggestions = useMemo(() => {
+    const q = searchInput.trim().toLowerCase();
+    if (!q || q.length < 2) return { products: [], vendors: [], categories: [] };
+
+    const matchingProducts = (allContextProducts || [])
+      .filter((p) => (p.name || p.title || '').toLowerCase().includes(q))
+      .slice(0, 4);
+
+    const matchingCategories = categories
+      .filter((c) => c.name.toLowerCase().includes(q))
+      .slice(0, 3);
+
+    const uniqueVendors = Array.from(
+      new Set((allContextProducts || []).map((p) => p.vendor_name || p.store_name).filter(Boolean))
+    )
+      .filter((v) => v.toLowerCase().includes(q))
+      .slice(0, 3);
+
+    return { products: matchingProducts, vendors: uniqueVendors, categories: matchingCategories };
+  }, [searchInput, allContextProducts, categories]);
+
   useEffect(() => {
     let filtered = [...allContextProducts];
 
     // 1. Filtrage par Catégorie
     if (selectedCategory) {
-      filtered = filtered.filter(p => isCategoryMatch(p, selectedCategory));
+      filtered = filtered.filter((p) => isCategoryMatch(p, selectedCategory));
     }
 
     // 2. Filtrage par Recherche textuelle
-    if (searchQ) {
-      const q = searchQ.toLowerCase().trim();
-      const qWords = q.split(/\s+/).filter(w => w.length > 2);
-      const queryFiltered = filtered.filter(p => {
+    const effectiveSearch = (searchInput || searchQ || '').toLowerCase().trim();
+    if (effectiveSearch) {
+      const qWords = effectiveSearch.split(/\s+/).filter((w) => w.length > 2);
+      filtered = filtered.filter((p) => {
         const name = (p.name || p.title || '').toLowerCase();
         const desc = (p.description || '').toLowerCase();
-        return name.includes(q) || desc.includes(q) || (qWords.length > 0 && qWords.some(w => name.includes(w)));
+        const vendor = (p.vendor_name || p.store_name || '').toLowerCase();
+        return (
+          name.includes(effectiveSearch) ||
+          desc.includes(effectiveSearch) ||
+          vendor.includes(effectiveSearch) ||
+          (qWords.length > 0 && qWords.some((w) => name.includes(w)))
+        );
       });
-      // Si la recherche textuelle stricte trouve des produits, on applique le filtre
-      if (queryFiltered.length > 0) {
-        filtered = queryFiltered;
-      }
     }
 
-    // 3. Filtrage par Prix
-    filtered = filtered.filter(p => !p.price || Number(p.price) <= maxPrice);
+    // 3. Filtrage par Tranche de Prix
+    filtered = filtered.filter((p) => {
+      const price = Number(p.price || 0);
+      return price >= minPrice && price <= maxPrice;
+    });
 
-    // 4. Tri
-    if (sortBy === 'price_asc') filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
-    if (sortBy === 'price_desc') filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+    // 4. En stock uniquement
+    if (inStockOnly) {
+      filtered = filtered.filter((p) => p.stock === undefined || Number(p.stock) > 0);
+    }
+
+    // 5. Promotions uniquement
+    if (onSaleOnly) {
+      filtered = filtered.filter((p) => p.oldPrice || p.old_price || p.is_flash_sale);
+    }
+
+    // 6. Tri multi-critères
+    if (sortBy === 'price_asc') {
+      filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+    } else if (sortBy === 'price_desc') {
+      filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+    } else if (sortBy === 'rating') {
+      filtered.sort((a, b) => Number(b.rating || b.avg_rating || 0) - Number(a.rating || a.avg_rating || 0));
+    } else if (sortBy === 'popular') {
+      filtered.sort((a, b) => Number(b.sales_count || b.review_count || 0) - Number(a.sales_count || a.review_count || 0));
+    } else if (sortBy === 'newest') {
+      filtered.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    }
 
     setProducts(filtered);
     setLoading(productsLoading);
-  }, [allContextProducts, productsLoading, categorySlug, searchQ, selectedCategory, sortBy, maxPrice]);
+  }, [
+    allContextProducts,
+    productsLoading,
+    categorySlug,
+    searchQ,
+    searchInput,
+    selectedCategory,
+    sortBy,
+    minPrice,
+    maxPrice,
+    inStockOnly,
+    onSaleOnly,
+  ]);
 
   const loadCategories = async () => {
     try {
@@ -189,12 +266,137 @@ export default function CatalogPage() {
           </div>
         </div>
 
+        {/* Barre de Recherche Intelligente avec Suggestions Live */}
+        <div ref={searchContainerRef} className="relative z-30">
+          <div className="relative flex items-center">
+            <Search className="absolute left-4 text-orange-400 pointer-events-none" size={18} />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              placeholder="Rechercher un article, pagne Baoulé, boutique, marque..."
+              className="w-full bg-slate-900/90 border border-slate-800 focus:border-orange-500 rounded-2xl pl-12 pr-10 py-3.5 text-sm text-white placeholder-slate-500 outline-none shadow-xl transition-all"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput('');
+                  setShowSuggestions(false);
+                }}
+                className="absolute right-3.5 text-slate-400 hover:text-white p-1"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          {/* Menu Dropdown de Suggestions Automatiques */}
+          {showSuggestions && searchInput.trim().length >= 2 && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 border border-slate-800 rounded-3xl shadow-2xl p-4 space-y-4 max-h-96 overflow-y-auto z-50 backdrop-blur-xl">
+              {/* Produits correspondants */}
+              {suggestions.products.length > 0 && (
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Produits</span>
+                  <div className="space-y-1">
+                    {suggestions.products.map((p) => (
+                      <Link
+                        key={p.id}
+                        to={`/products/${p.id}`}
+                        onClick={() => setShowSuggestions(false)}
+                        className="flex items-center justify-between p-2 rounded-xl hover:bg-slate-800/80 transition-colors"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={p.image || p.image_url || getFallbackProductImage(p.name)}
+                            alt=""
+                            className="w-9 h-9 rounded-lg object-cover bg-slate-950"
+                          />
+                          <span className="text-xs font-bold text-white truncate">{p.name || p.title}</span>
+                        </div>
+                        <span className="text-xs font-black text-orange-400 shrink-0">{formatPrice(p.price)}</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Boutiques correspondantes */}
+              {suggestions.vendors.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Boutiques</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.vendors.map((v, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setSearchInput(v);
+                          setShowSuggestions(false);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold hover:bg-purple-500/20 transition-colors"
+                      >
+                        <Store size={12} /> {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Catégories correspondantes */}
+              {suggestions.categories.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Catégories</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.categories.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => {
+                          setSelectedCategory(c.id);
+                          setSearchInput('');
+                          setShowSuggestions(false);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs font-semibold hover:bg-orange-500/20 transition-colors"
+                      >
+                        <Tag size={12} /> {c.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {suggestions.products.length === 0 && suggestions.vendors.length === 0 && suggestions.categories.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-2">Aucune suggestion trouvée pour "{searchInput}"</p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filtres Latéraux Desktop */}
           <aside className="hidden lg:block w-64 space-y-6 flex-shrink-0">
             <div className="glass-panel p-6 rounded-3xl border border-slate-800 space-y-6 sticky top-24">
-              <div className="flex items-center gap-2 text-white font-bold text-sm border-b border-slate-800 pb-3">
-                <SlidersHorizontal size={16} className="text-orange-400" /> Filtres de recherche
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-white font-bold text-sm">
+                  <SlidersHorizontal size={16} className="text-orange-400" /> Filtres
+                </div>
+                {(selectedCategory || searchInput || maxPrice < 500000 || inStockOnly || onSaleOnly) && (
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('');
+                      setSearchInput('');
+                      setMinPrice(0);
+                      setMaxPrice(500000);
+                      setInStockOnly(false);
+                      setOnSaleOnly(false);
+                    }}
+                    className="text-[10px] text-orange-400 font-bold hover:underline"
+                  >
+                    Effacer
+                  </button>
+                )}
               </div>
 
               {/* Catégories */}
@@ -227,21 +429,46 @@ export default function CatalogPage() {
                 </div>
               </div>
 
-              {/* Filtre par Prix Max */}
-              <div className="space-y-2 pt-2 border-t border-slate-800">
+              {/* Filtre par Tranche de Prix */}
+              <div className="space-y-3 pt-3 border-t border-slate-800">
                 <div className="flex justify-between items-center text-[11px] font-bold">
-                  <span className="text-slate-400 uppercase tracking-wider">Prix Maximum</span>
-                  <span className="text-orange-400">{formatPrice(maxPrice)}</span>
+                  <span className="text-slate-400 uppercase tracking-wider">Budget Max</span>
+                  <span className="text-orange-400 font-black">{formatPrice(maxPrice)}</span>
                 </div>
                 <input
                   type="range"
-                  min="5000"
+                  min="2000"
                   max="500000"
                   step="5000"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   className="w-full accent-orange-500 bg-slate-800 cursor-pointer"
                 />
+              </div>
+
+              {/* Filtres Rapides Stock & Promos */}
+              <div className="space-y-2.5 pt-3 border-t border-slate-800 text-xs">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={inStockOnly}
+                    onChange={(e) => setInStockOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-orange-500 accent-orange-500 cursor-pointer"
+                  />
+                  <span>En stock uniquement</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer select-none text-slate-300 hover:text-white">
+                  <input
+                    type="checkbox"
+                    checked={onSaleOnly}
+                    onChange={(e) => setOnSaleOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-orange-500 accent-orange-500 cursor-pointer"
+                  />
+                  <span className="flex items-center gap-1.5 text-amber-400 font-bold">
+                    <Zap size={13} /> Promotions & Flash
+                  </span>
+                </label>
               </div>
             </div>
           </aside>
@@ -333,6 +560,8 @@ export default function CatalogPage() {
                   className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none cursor-pointer focus:border-orange-500"
                 >
                   <option value="newest">Plus récents</option>
+                  <option value="popular">Plus populaires</option>
+                  <option value="rating">Meilleures notes ⭐</option>
                   <option value="price_asc">Prix croissant</option>
                   <option value="price_desc">Prix décroissant</option>
                 </select>
@@ -390,10 +619,15 @@ export default function CatalogPage() {
                         {product.isCultural && (
                           <div className="absolute inset-0 bg-amber-500/10 pointer-events-none animate-pagne-flash" />
                         )}
-                        {product.oldPrice && (
-                          <span className="absolute top-3 right-3 bg-orange-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-full shadow-md">
-                            PROMO
+                        {product.oldPrice && product.oldPrice > product.price && (
+                          <span className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 text-[10px] font-black px-2.5 py-1 rounded-full shadow-md z-10">
+                            -{Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)}%
                           </span>
+                        )}
+                        {product.flash_sale_active && (
+                          <div className="absolute top-3 right-3 z-20">
+                            <FlashSaleCountdown compact />
+                          </div>
                         )}
                         {/* Bouton Favori */}
                         <button

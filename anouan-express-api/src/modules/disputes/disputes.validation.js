@@ -2,8 +2,13 @@ const Joi = require('joi');
 const { validate } = require('../../middlewares/validate');
 
 const openDisputeSchema = Joi.object({
-  orderId: Joi.string().uuid().required(),
-  reason: Joi.string().min(20).required()
+  orderId: Joi.string().required(),
+  reason: Joi.string().min(5).required(),
+  type: Joi.string().allow('', null).optional(),
+  images: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.string()
+  ).optional(),
 });
 
 const resolveDisputeSchema = Joi.object({
@@ -12,6 +17,6 @@ const resolveDisputeSchema = Joi.object({
 });
 
 module.exports = {
-  validateOpenDispute: validate(openDisputeSchema),
-  validateResolveDispute: validate(resolveDisputeSchema)
+  validateOpenDispute: validate({ body: openDisputeSchema }),
+  validateResolveDispute: validate({ body: resolveDisputeSchema })
 };

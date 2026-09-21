@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
+import { User, Mail, Phone, Lock, Eye, EyeOff, ArrowRight, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
 import Logo from '../../components/ui/Logo';
@@ -104,26 +104,12 @@ export default function RegisterPage() {
     }
   };
 
-  const perks = [
-    'Achetez en toute confiance',
-    'Retrait sécurisé par code unique',
-    'Espace Vendeur & Suivi en direct',
-  ];
-
   return (
     <AuthLayout
       logo={
         <>
           <div className="flex justify-center mb-6">
             <Logo size="xl" to="/" />
-          </div>
-          <div className="flex justify-center gap-3 mb-6 flex-wrap">
-            {perks.map((p) => (
-              <div key={p} className="flex items-center gap-1.5 text-orange-300 text-xs font-medium bg-slate-900/80 px-3 py-1.5 rounded-full border border-orange-500/20 shadow-md">
-                <CheckCircle className="w-3.5 h-3.5 text-orange-400 shrink-0" />
-                {p}
-              </div>
-            ))}
           </div>
         </>
       }

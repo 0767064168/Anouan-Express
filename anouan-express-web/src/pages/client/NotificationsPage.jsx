@@ -2,7 +2,8 @@
 // Centre de notifications client — Dark Premium Orange
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Package, Tag, ShieldCheck, Info, CheckCheck, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Package, Tag, ShieldCheck, Info, CheckCheck, Trash2, ChevronRight } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
 import { notificationsAPI } from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
@@ -26,6 +27,7 @@ const TYPE_LABELS = {
 };
 
 export default function NotificationsPage() {
+  const navigate = useNavigate();
   const toast = useToast();
   const [notifs, setNotifs] = useState([]);
   const [filter, setFilter] = useState('all');
@@ -35,17 +37,25 @@ export default function NotificationsPage() {
       const res = await notificationsAPI.getAll({ limit: 50 });
       const data = res.data?.data || res.data || [];
       if (Array.isArray(data) && data.length > 0) {
-        setNotifs(data.map(n => ({
-          id: n.id,
-          type: n.type || 'system',
-          read: !!n.is_read,
-          title: n.title,
-          body: n.body,
-          time: new Date(n.created_at).toLocaleDateString('fr-CI', { hour: '2-digit', minute: '2-digit' }),
-          icon: n.type === 'order' ? Package : Bell,
-          iconBg: 'bg-emerald-500/20 border-emerald-500/30',
-          iconColor: 'text-emerald-400',
-        })));
+        setNotifs(data.map(n => {
+          let meta = {};
+          try {
+            meta = typeof n.metadata === 'string' ? JSON.parse(n.metadata || '{}') : (n.metadata || {});
+          } catch {}
+          const orderId = meta.orderId || meta.order_id || n.order_id;
+          return {
+            id: n.id,
+            type: n.type || 'system',
+            read: !!n.is_read,
+            title: n.title,
+            body: n.body,
+            orderId,
+            time: new Date(n.created_at).toLocaleDateString('fr-CI', { hour: '2-digit', minute: '2-digit' }),
+            icon: n.type === 'order' ? Package : (n.type === 'promo' ? Tag : (n.type === 'security' ? ShieldCheck : Bell)),
+            iconBg: n.type === 'order' ? 'bg-orange-500/20 border-orange-500/30' : 'bg-emerald-500/20 border-emerald-500/30',
+            iconColor: n.type === 'order' ? 'text-orange-400' : 'text-emerald-400',
+          };
+        }));
         return;
       }
     } catch {}
@@ -89,6 +99,17 @@ export default function NotificationsPage() {
   const clearAll = () => {
     setNotifs([]);
     toast.info('Centre de notifications vidé.');
+  };
+
+  const handleNotifClick = (notif) => {
+    if (!notif.read) {
+      markRead(notif.id);
+    }
+    if (notif.orderId) {
+      navigate(`/orders/${notif.orderId}`);
+    } else if (notif.type === 'order') {
+      navigate('/orders');
+    }
   };
 
   return (
@@ -160,7 +181,7 @@ export default function NotificationsPage() {
               return (
                 <div
                   key={notif.id}
-                  onClick={() => markRead(notif.id)}
+                  onClick={() => handleNotifClick(notif)}
                   className={`glass-panel rounded-3xl border p-5 flex items-start gap-4 cursor-pointer transition-all group ${
                     notif.read
                       ? 'border-slate-800 opacity-60 hover:opacity-100'
@@ -184,12 +205,20 @@ export default function NotificationsPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); deleteNotif(notif.id); }}
                         className="shrink-0 p-1 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Supprimer"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                     <p className="text-xs text-slate-400 leading-relaxed">{notif.body}</p>
-                    <p className="text-[10px] text-slate-600 font-semibold pt-1">{notif.time}</p>
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-[10px] text-slate-600 font-semibold">{notif.time}</p>
+                      {notif.orderId && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-400 group-hover:text-orange-300 transition-colors">
+                          Voir la commande <ChevronRight size={13} />
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

@@ -27,6 +27,7 @@ export default defineConfig(({ mode }) => ({
           'vendor-react':    ['react', 'react-dom', 'react-router-dom'],
           'vendor-ui':       ['lucide-react', 'clsx', 'tailwind-merge'],
           'vendor-qrcode':   ['qrcode.react'],
+          'vendor-qrscanner': ['html5-qrcode'],
           'vendor-axios':    ['axios'],
           'vendor-recharts': ['recharts'],
         },

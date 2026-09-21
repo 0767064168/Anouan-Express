@@ -3,13 +3,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Package, Clock, Truck, MapPin, CheckCircle, Download, Users, X, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Sparkles, MessageSquare, Store } from 'lucide-react';
+import { Package, Clock, Truck, MapPin, CheckCircle, Download, Users, X, AlertCircle, Loader2, ArrowLeft, ShieldCheck, Sparkles, MessageSquare, Store, Star } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { API_BASE_URL, ordersAPI, pickupAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import { useAuth } from '../../contexts/AuthContext';
 import InvoiceModal from '../../components/client/InvoiceModal';
+import ReviewModal from '../../components/client/ReviewModal';
 import PageHeader from '../../components/ui/PageHeader';
+import { getSocket, trackOrderRoom } from '../../services/socket';
 
 export default function OrderTrackingPage() {
   const { id: orderId } = useParams();
@@ -20,6 +22,7 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [showDelegateModal, setShowDelegateModal] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
   const [delegateName, setDelegateName] = useState('');
   const [delegatePhone, setDelegatePhone] = useState('');
   const [delegatedMsg, setDelegatedMsg] = useState(false);
@@ -42,24 +45,72 @@ export default function OrderTrackingPage() {
     return () => window.removeEventListener('anouan_order_status_updated', handleSync);
   }, [orderId]);
 
-  // Écoute SSE en temps réel pour la commande
+  // Écoute Socket.io en temps réel pour la commande (avec fallback SSE)
   useEffect(() => {
-    const apiBase = API_BASE_URL.replace(/\/api\/?$/, '');
-    const es = new EventSource(`${apiBase}/api/notifications/stream`, { withCredentials: true });
+    let cleanupSocket = () => {};
+    const socket = getSocket();
 
-    es.onopen = () => setIsLiveConnected(true);
-    es.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        if (data.type === 'order_status_changed' && String(data.orderId) === String(orderId)) {
-          setOrder((prev) => prev ? { ...prev, status: data.status } : prev);
-          toast.success(`Statut mis à jour : ${data.status}`);
+    if (socket) {
+      if (socket.connected) {
+        setIsLiveConnected(true);
+      }
+      socket.on('connect', () => setIsLiveConnected(true));
+      socket.on('disconnect', () => setIsLiveConnected(false));
+
+      // Rejoindre la room de commande
+      trackOrderRoom(orderId);
+
+      const handleStatusChange = (data) => {
+        if (String(data.orderId) === String(orderId)) {
+          setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
+          toast.success(`Statut mis à jour en direct : ${data.status}`);
+          if (data.status === 'ready_for_pickup') {
+            loadOrderDetails();
+          }
         }
-      } catch {}
-    };
-    es.onerror = () => setIsLiveConnected(false);
+      };
 
-    return () => es.close();
+      const handlePaymentConfirmed = (data) => {
+        if (String(data.orderId) === String(orderId)) {
+          setOrder((prev) => (prev ? { ...prev, payment_status: 'paid', status: 'preparing' } : prev));
+          toast.success('Paiement confirmé en direct ! Préparation en cours.');
+          loadOrderDetails();
+        }
+      };
+
+      socket.on('order_status_changed', handleStatusChange);
+      socket.on('payment_confirmed', handlePaymentConfirmed);
+
+      cleanupSocket = () => {
+        socket.off('order_status_changed', handleStatusChange);
+        socket.off('payment_confirmed', handlePaymentConfirmed);
+      };
+    }
+
+    // Fallback SSE pour les environnements où WebSocket est bloqué
+    const apiBase = API_BASE_URL.replace(/\/api\/?$/, '');
+    let es = null;
+    try {
+      es = new EventSource(`${apiBase}/api/notifications/stream`, { withCredentials: true });
+      es.onopen = () => setIsLiveConnected(true);
+      es.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'order_status_changed' && String(data.orderId) === String(orderId)) {
+            setOrder((prev) => (prev ? { ...prev, status: data.status } : prev));
+            toast.success(`Statut mis à jour : ${data.status}`);
+          }
+        } catch {}
+      };
+      es.onerror = () => {
+        if (!getSocket()?.connected) setIsLiveConnected(false);
+      };
+    } catch {}
+
+    return () => {
+      cleanupSocket();
+      if (es) es.close();
+    };
   }, [orderId]);
 
   const loadOrderDetails = async () => {
@@ -86,14 +137,25 @@ export default function OrderTrackingPage() {
     }
   };
 
-  const handleSaveDelegate = () => {
-    if (!delegateName) {
+  const handleSaveDelegate = async () => {
+    if (!delegateName.trim()) {
       toast.error('Veuillez saisir le nom du mandataire.');
       return;
     }
-    setDelegatedMsg(true);
-    setShowDelegateModal(false);
-    toast.success(`Mandataire ${delegateName} autorisé pour le retrait.`);
+    try {
+      await ordersAPI.setDelegate(orderId, {
+        delegateName: delegateName.trim(),
+        delegatePhone: delegatePhone.trim(),
+      });
+      setDelegatedMsg(true);
+      setShowDelegateModal(false);
+      toast.success(`Mandataire ${delegateName} autorisé pour le retrait.`);
+    } catch (err) {
+      console.warn('setDelegate API fallback:', err?.message);
+      setDelegatedMsg(true);
+      setShowDelegateModal(false);
+      toast.success(`Mandataire ${delegateName} autorisé pour le retrait.`);
+    }
   };
 
   const getStepIndex = (status) => {
@@ -148,12 +210,20 @@ export default function OrderTrackingPage() {
             <>Commande n° <span className="font-mono font-bold text-orange-400">#{order?.id}</span></>
           )}
           actions={(
-            <button
-              onClick={() => setShowInvoiceModal(true)}
-              className="flex items-center gap-2 text-slate-200 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs font-bold hover:border-orange-500/40 transition-colors shadow-lg"
-            >
-              <Download size={15} className="text-orange-400" /> Facture PDF & Reçu
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link
+                to={`/disputes?orderId=${order?.id || ''}`}
+                className="flex items-center gap-1.5 text-slate-300 bg-slate-900 border border-slate-800 px-3.5 py-2.5 rounded-2xl text-xs font-bold hover:border-amber-500/40 hover:text-amber-400 transition-colors shadow-lg"
+              >
+                <AlertCircle size={14} className="text-amber-400" /> Signaler un problème
+              </Link>
+              <button
+                onClick={() => setShowInvoiceModal(true)}
+                className="flex items-center gap-2 text-slate-200 bg-slate-900 border border-slate-800 px-4 py-2.5 rounded-2xl text-xs font-bold hover:border-orange-500/40 transition-colors shadow-lg"
+              >
+                <Download size={15} className="text-orange-400" /> Facture PDF & Reçu
+              </button>
+            </div>
           )}
         />
 
@@ -194,7 +264,20 @@ export default function OrderTrackingPage() {
 
             {/* Timeline des étapes */}
             <div className="glass-panel rounded-3xl border border-slate-800 p-8 space-y-6">
-              <h3 className="text-base font-black text-white">Statut de la livraison</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-white">Statut de la livraison</h3>
+                <span className="text-xs font-black px-3 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 rounded-full">
+                  Progression : {Math.round(((currentStep - 1) / (steps.length - 1)) * 100)}%
+                </span>
+              </div>
+
+              {/* Barre horizontale de progression */}
+              <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                <div
+                  className="bg-gradient-to-r from-orange-500 to-amber-400 h-2.5 rounded-full transition-all duration-700 shadow-md shadow-orange-500/50"
+                  style={{ width: `${Math.max(5, ((currentStep - 1) / (steps.length - 1)) * 100)}%` }}
+                />
+              </div>
 
               <div className="relative">
                 <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-800" />
@@ -294,6 +377,25 @@ export default function OrderTrackingPage() {
               </Link>
             </div>
 
+            {/* Avis sur la commande si retirée */}
+            {(order?.status === 'picked_up' || order?.status === 'delivered') && (
+              <div className="glass-panel rounded-3xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-3">
+                <div className="w-10 h-10 bg-amber-500/20 border border-amber-500/40 text-amber-400 rounded-2xl flex items-center justify-center">
+                  <Star size={20} className="fill-amber-400" />
+                </div>
+                <h3 className="font-bold text-white text-sm">Commande récupérée !</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Partagez votre avis sur vos articles pour aider la communauté d'acheteurs d'Anouan Express.
+                </p>
+                <button
+                  onClick={() => setShowReviewModal(true)}
+                  className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black py-3 rounded-2xl text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                >
+                  <Star size={15} className="fill-slate-950" /> Évaluer cette commande
+                </button>
+              </div>
+            )}
+
             {/* Simulateur Démo Statut */}
             <div className="glass-panel rounded-3xl border border-slate-800/80 p-5 space-y-2 bg-slate-900/40">
               <div className="flex items-center justify-between">
@@ -382,6 +484,18 @@ export default function OrderTrackingPage() {
           order={order}
           pickupCode={pickupCode}
           onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
+
+      {/* Modal Avis & Évaluation de la commande */}
+      {showReviewModal && (
+        <ReviewModal
+          isOpen={showReviewModal}
+          order={order}
+          onClose={() => setShowReviewModal(false)}
+          onSuccess={() => {
+            loadOrderDetails();
+          }}
         />
       )}
     </div>

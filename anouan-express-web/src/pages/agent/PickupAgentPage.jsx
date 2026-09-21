@@ -10,11 +10,12 @@ import {
   TrendingUp, Users, Receipt, CreditCard, ChevronRight, Eye, Printer, X, Truck
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { pickupAPI } from '../../services/api';
+import { pickupAPI, ordersAPI } from '../../services/api';
 import { Link, useNavigate } from 'react-router-dom';
 import Logo from '../../components/ui/Logo';
 import { PaymentLogo } from '../../components/ui/PaymentLogos';
 import PageHeader from '../../components/ui/PageHeader';
+import QrScannerModal from '../../components/agent/QrScannerModal';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const cleanPhone = (str) => (str || '').replace(/\D/g, '');
@@ -136,8 +137,11 @@ export default function PickupAgentPage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [isCameraActive, setIsCameraActive] = useState(false);
+  const [showQrScanner, setShowQrScanner] = useState(false);
   const [idCardVerified, setIdCardVerified] = useState(false);
   const [cashCollectedConfirmed, setCashCollectedConfirmed] = useState(false);
+  const [isDelegatedPickup, setIsDelegatedPickup] = useState(false);
+  const [delegateDetails, setDelegateDetails] = useState({ name: '', phone: '' });
 
   // Modal Reçu de caisse
   const [receiptOrder, setReceiptOrder] = useState(null);
@@ -422,6 +426,9 @@ export default function PickupAgentPage() {
     navigate('/auth/login');
   };
 
+  const assignedStoreName = user?.store_name || 'Point relais non affecté';
+  const assignedCity = user?.store_city || 'Ville non définie';
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-orange-500 selection:text-slate-950">
       {/* ── Header ── */}
@@ -429,7 +436,7 @@ export default function PickupAgentPage() {
         <div className="flex items-center gap-3">
           <Logo size="sm" to="/agent" />
           <span className="hidden sm:inline-block px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[10px] font-black rounded-full uppercase tracking-wider">
-            GUICHET MAGASIN CENTRAL BOUAKÉ 🇨🇮
+            {assignedStoreName} · {assignedCity}
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -453,11 +460,20 @@ export default function PickupAgentPage() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-6 flex flex-col space-y-6">
 
         <PageHeader
-          eyebrow="Guichet Magasin Central Bouaké"
+          eyebrow={`${assignedStoreName} · ${assignedCity}`}
           eyebrowIcon={Store}
           title="Tableau de bord Agent"
-          subtitle={`Bienvenue ${user?.first_name || user?.name || 'Agent'} : gérez les retraits, réceptions et encaissements du magasin.`}
+          subtitle={`Bienvenue ${user?.first_name || user?.name || 'Agent'} : gérez les retraits, réceptions et encaissements de votre point relais.`}
         />
+
+        <div className="flex items-center gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 px-4 py-3">
+          <Store size={18} className="text-orange-400 shrink-0" />
+          <div>
+            <p className="text-[10px] uppercase tracking-wider font-black text-orange-400">Affectation administrative</p>
+            <p className="text-sm font-bold text-white">{assignedStoreName}</p>
+            <p className="text-[11px] text-slate-400">Ville : {assignedCity}</p>
+          </div>
+        </div>
 
         {/* ── Cartes d'Indicateurs Financiers & Métriques Caisse ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -781,26 +797,21 @@ export default function PickupAgentPage() {
                 </form>
               )}
 
-              {/* Viseur Scanner Caméra */}
+              {/* Scanner QR Caméra réel */}
               {isCameraActive && searchMode === 'code' && (
                 <div className="p-4 rounded-2xl bg-slate-950 border border-orange-500/30 space-y-3 animate-in zoom-in-95 text-center">
                   <div className="flex items-center justify-center gap-2 text-orange-400 text-xs font-bold">
-                    <QrCode size={18} /> Viseur Optique Caméra Activé
+                    <QrCode size={18} /> Scanner QR Code — Caméra
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    Pointez la caméra vers le smartphone du client ou choisissez un colis à simuler :
+                    Appuyez sur le bouton pour ouvrir la caméra et scanner le QR du client.
                   </p>
-                  <div className="flex flex-wrap justify-center gap-2 pt-1">
-                    {waitingOrders.map((ord) => (
-                      <button
-                        key={ord.orderId}
-                        onClick={() => handleSimulateScan(ord)}
-                        className="px-3 py-1.5 bg-slate-900 border border-slate-700 hover:border-orange-500 text-slate-200 text-xs font-mono rounded-xl transition-all"
-                      >
-                        Simuler QR: {ord.orderId} ({ord.code})
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={() => setShowQrScanner(true)}
+                    className="mx-auto flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white text-xs font-black rounded-2xl transition-all shadow-lg shadow-orange-500/30"
+                  >
+                    <Camera size={16} /> Ouvrir la Caméra
+                  </button>
                 </div>
               )}
             </div>
@@ -966,8 +977,8 @@ export default function PickupAgentPage() {
                   </div>
                 </div>
 
-                {/* Contrôle d'identité physique */}
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+                {/* Contrôle d'identité physique & Retrait par un Tiers */}
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -978,10 +989,41 @@ export default function PickupAgentPage() {
                     <div className="text-xs text-slate-300">
                       <span className="font-bold text-white flex items-center gap-1.5">
                         <FileCheck size={14} className="text-emerald-400" />
-                        Identité du client vérifiée au guichet (CNI / Téléphone)
+                        Identité du récupérateur vérifiée (CNI / Téléphone)
                       </span>
                     </div>
                   </label>
+
+                  <div className="pt-2 border-t border-slate-900 flex items-center justify-between">
+                    <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-400">
+                      <input
+                        type="checkbox"
+                        checked={isDelegatedPickup}
+                        onChange={(e) => setIsDelegatedPickup(e.target.checked)}
+                        className="w-3.5 h-3.5 rounded text-amber-500 accent-amber-500 focus:ring-0 cursor-pointer"
+                      />
+                      <span className="font-semibold text-amber-400">Retrait par un tiers / mandataire</span>
+                    </label>
+                  </div>
+
+                  {isDelegatedPickup && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 animate-in fade-in">
+                      <input
+                        type="text"
+                        value={delegateDetails.name}
+                        onChange={(e) => setDelegateDetails(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Nom du mandataire"
+                        className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:border-orange-500 outline-none"
+                      />
+                      <input
+                        type="tel"
+                        value={delegateDetails.phone}
+                        onChange={(e) => setDelegateDetails(prev => ({ ...prev, phone: e.target.value }))}
+                        placeholder="Tél. du mandataire"
+                        className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:border-orange-500 outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Boutons d'action */}
@@ -1341,6 +1383,19 @@ export default function PickupAgentPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Scanner QR Code Réel */}
+      {showQrScanner && (
+        <QrScannerModal
+          onScan={(decodedCode) => {
+            setShowQrScanner(false);
+            setIsCameraActive(false);
+            setCode(decodedCode);
+            handleVerifyByCode(decodedCode);
+          }}
+          onClose={() => setShowQrScanner(false)}
+        />
       )}
     </div>
   );

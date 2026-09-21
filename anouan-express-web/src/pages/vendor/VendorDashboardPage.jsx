@@ -7,7 +7,7 @@ import {
   Plus, DollarSign, AlertTriangle, CheckCircle2, Store, Sparkles, RefreshCw, MessageSquare
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { vendorsAPI, ordersAPI } from '../../services/api';
+import { vendorsAPI, ordersAPI, productsAPI, reviewsAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import VendorAnalyticsChart from '../../components/vendor/VendorAnalyticsChart';
 import PageHeader from '../../components/ui/PageHeader';
@@ -32,33 +32,41 @@ const LOW_STOCK_ITEMS = [
   { id: 6,   name: 'Sac à Main Cuir & Pagne WAX',        stock: 3, category: 'Accessoires' },
 ];
 
-const RECENT_REVIEWS = [
-  { id: 1, name: 'Kouadio Jean-Marc', rating: 5, date: 'Aujourd\'hui', comment: 'Pagne Baoulé magnifique ! Qualité d\'exception et retrait rapide au Magasin Central.' },
-  { id: 2, name: 'Awa Koné', rating: 5, date: 'Hier', comment: 'Vendeur très professionnel. Produit conforme.' },
-];
-
 export default function VendorDashboardPage() {
   const toast = useToast();
   const [stats, setStats] = useState({
-    totalRevenue: 35500000,
-    monthRevenue: 4250000,
-    totalOrders: 1420,
-    pendingOrders: 8,
-    totalProducts: 24,
-    activeProducts: 22,
-    avgRating: 4.9,
-    reviewCount: 184,
+    totalRevenue: 0,
+    monthRevenue: 0,
+    totalOrders: 0,
+    pendingOrders: 0,
+    totalProducts: 0,
+    activeProducts: 0,
+    avgRating: 0,
+    reviewCount: 0,
   });
+  const [vendorProfile, setVendorProfile] = useState(null);
+  const [orderSummary, setOrderSummary] = useState({ deposited: 0, pickedUp: 0, averageBasket: 0 });
+  const [recentReviews, setRecentReviews] = useState([]);
 
   const [recentOrders, setRecentOrders] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const loadVendorData = () => {
     Promise.all([
       vendorsAPI.getDashboard().catch(() => null),
+      vendorsAPI.getMyVendor().catch(() => null),
       ordersAPI.getVendorOrders().catch(() => null),
-    ]).then(([dashRes, ordersRes]) => {
+      productsAPI.getVendorProducts().catch(() => null),
+    ]).then(([dashRes, profileRes, ordersRes, prodsRes]) => {
       if (dashRes?.data) setStats((prev) => ({ ...prev, ...(dashRes.data?.data || dashRes.data) }));
+      if (profileRes?.data) setVendorProfile(profileRes.data?.data || profileRes.data);
+      const profile = profileRes?.data?.data || profileRes?.data;
+      if (profile?.id) {
+        reviewsAPI.getVendorReviews(profile.id, { limit: 3 })
+          .then((reviewRes) => setRecentReviews(reviewRes.data?.data || reviewRes.data || []))
+          .catch(() => setRecentReviews([]));
+      }
       const raw = ordersRes?.data?.orders || ordersRes?.data?.data || ordersRes?.data || [];
       const fetched = Array.isArray(raw) ? raw.map(o => ({
         id: o.tracking_number || o.id,
@@ -68,7 +76,20 @@ export default function VendorDashboardPage() {
         created_at: o.created_at
       })) : [];
 
+      const totalAmount = fetched.reduce((sum, order) => sum + order.amount, 0);
+      setOrderSummary({
+        deposited: fetched.filter((order) => ['shipped_to_store', 'ready_for_pickup', 'picked_up'].includes(order.status)).length,
+        pickedUp: fetched.filter((order) => order.status === 'picked_up').length,
+        averageBasket: fetched.length ? totalAmount / fetched.length : 0,
+      });
+
       setRecentOrders(fetched.slice(0, 5));
+
+      const rawProds = prodsRes?.data?.data || prodsRes?.data || [];
+      if (Array.isArray(rawProds)) {
+        const low = rawProds.filter(p => Number(p.stock || 0) <= 5);
+        setLowStockProducts(low.slice(0, 5));
+      }
     }).finally(() => setLoading(false));
   };
 
@@ -85,6 +106,8 @@ export default function VendorDashboardPage() {
     { title: 'Articles en Vente', value: stats.totalProducts,            sub: `${stats.activeProducts || 0} actifs sur site`, icon: Package,     grad: 'from-purple-500/20 to-violet-500/10', iconCls: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
     { title: 'Note Boutique',    value: Number(stats.avgRating || 4.9).toFixed(1) + ' ⭐', sub: `${stats.reviewCount || 184} avis clients`, icon: Star, grad: 'from-amber-500/20 to-yellow-500/10', iconCls: 'bg-amber-500/20 text-amber-400 border-amber-500/30' },
   ];
+  const monthlyGoal = 5000000;
+  const monthlyProgress = Math.min(100, Math.round((Number(stats.monthRevenue || 0) / monthlyGoal) * 100));
 
   if (loading) return (
     <div className="space-y-6 animate-pulse">
@@ -101,8 +124,8 @@ export default function VendorDashboardPage() {
       <PageHeader
         eyebrow="Espace Vendeur Partenaire"
         eyebrowIcon={Store}
-        title="Boutique « Maison du Pagne Bouaké »"
-        subtitle="Gestion de votre catalogue, commandes et dépôts au Magasin Central"
+        title={`Boutique « ${vendorProfile?.shop_name || 'Votre boutique'} »`}
+        subtitle="Gestion de votre catalogue, commandes et dépôts au point relais"
         actions={
           <>
             <Link
@@ -150,7 +173,7 @@ export default function VendorDashboardPage() {
               <p className="text-xs text-slate-400">Progression vers votre objectif de 5 000 000 FCFA</p>
             </div>
             <span className="text-sm font-black text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-1.5 rounded-xl">
-              85% Atteint
+              {monthlyProgress}% Atteint
             </span>
           </div>
 
@@ -160,22 +183,22 @@ export default function VendorDashboardPage() {
               <span className="text-slate-400">Objectif : 5 000 000 FCFA</span>
             </div>
             <div className="h-3 bg-slate-900 border border-slate-800 rounded-full overflow-hidden p-0.5">
-              <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full shadow-lg shadow-orange-500/50 transition-all duration-500" style={{ width: '85%' }} />
+              <div className="h-full bg-gradient-to-r from-orange-500 to-amber-400 rounded-full shadow-lg shadow-orange-500/50 transition-all duration-500" style={{ width: `${monthlyProgress}%` }} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 pt-2 text-center text-xs">
             <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800">
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Dépôts au Magasin</span>
-              <span className="text-base font-black text-white">42 colis</span>
+              <span className="text-base font-black text-white">{orderSummary.deposited} colis</span>
             </div>
             <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800">
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Retraits Validés</span>
-              <span className="text-base font-black text-emerald-400">38 colis</span>
+              <span className="text-base font-black text-emerald-400">{orderSummary.pickedUp} colis</span>
             </div>
             <div className="p-3 bg-slate-900/60 rounded-2xl border border-slate-800">
               <span className="text-slate-400 block text-[10px] uppercase font-bold">Panier Moyen</span>
-              <span className="text-base font-black text-orange-400">25 000 FCFA</span>
+              <span className="text-base font-black text-orange-400">{formatPrice(orderSummary.averageBasket)}</span>
             </div>
           </div>
 
@@ -187,28 +210,35 @@ export default function VendorDashboardPage() {
         <div className="glass-panel rounded-3xl p-6 border border-slate-800 space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-sm font-black text-white flex items-center gap-2">
-              <AlertTriangle size={16} className="text-amber-400" /> Stock Faible (&lt; 5)
+              <AlertTriangle size={16} className="text-amber-400" /> Stock Faible (&le; 5)
             </h2>
             <span className="text-[10px] font-bold bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20">
-              2 articles
+              {lowStockProducts.length} article{lowStockProducts.length > 1 ? 's' : ''}
             </span>
           </div>
 
           <div className="space-y-3">
-            {LOW_STOCK_ITEMS.map((item) => (
-              <div key={item.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
-                <div className="min-w-0 pr-2">
-                  <p className="font-bold text-white truncate">{item.name}</p>
-                  <span className="text-[10px] text-amber-400 font-bold">Reste seulement {item.stock} unités</span>
-                </div>
-                <Link
-                  to="/vendor/products"
-                  className="shrink-0 p-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 rounded-xl font-bold text-[10px] border border-orange-500/20 transition-all"
-                >
-                  Réassort
-                </Link>
+            {lowStockProducts.length === 0 ? (
+              <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 text-center text-xs text-slate-400">
+                <CheckCircle2 size={24} className="text-emerald-400 mx-auto mb-1.5" />
+                <span>Tous vos stocks sont confortables (&gt; 5 unités).</span>
               </div>
-            ))}
+            ) : (
+              lowStockProducts.map((item) => (
+                <div key={item.id} className="p-3 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-between text-xs">
+                  <div className="min-w-0 pr-2">
+                    <p className="font-bold text-white truncate">{item.title || item.name}</p>
+                    <span className="text-[10px] text-amber-400 font-bold">Reste seulement {item.stock} unités</span>
+                  </div>
+                  <Link
+                    to="/vendor/products"
+                    className="shrink-0 p-2 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 rounded-xl font-bold text-[10px] border border-orange-500/20 transition-all"
+                  >
+                    Réassort
+                  </Link>
+                </div>
+              ))
+            )}
           </div>
 
           <Link
@@ -277,21 +307,24 @@ export default function VendorDashboardPage() {
               <MessageSquare size={16} className="text-orange-400" /> Derniers Avis Clients
             </h2>
             <span className="text-amber-400 font-bold text-xs flex items-center gap-1">
-              <Star size={12} className="fill-current" /> 4.9 / 5
+              <Star size={12} className="fill-current" /> {Number(stats.avgRating || 0).toFixed(1)} / 5
             </span>
           </div>
 
           <div className="space-y-3">
-            {RECENT_REVIEWS.map((rev) => (
+            {recentReviews.length === 0 && (
+              <div className="p-4 bg-slate-900 rounded-2xl border border-slate-800 text-xs text-slate-500 text-center">Aucun avis client pour le moment.</div>
+            )}
+            {recentReviews.map((rev) => (
               <div key={rev.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-800 space-y-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="font-bold text-white text-xs">{rev.name}</span>
+                  <span className="font-bold text-white text-xs">{rev.client_name || 'Client Anouan'}</span>
                   <div className="flex text-amber-400 text-[10px]">
                     {[...Array(rev.rating)].map((_, i) => <Star key={i} size={10} className="fill-current" />)}
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-300 leading-snug">{rev.comment}</p>
-                <span className="text-[9px] text-slate-500 font-semibold block pt-0.5">{rev.date}</span>
+                <p className="text-[11px] text-slate-300 leading-snug">{rev.comment || 'Avis sans commentaire.'}</p>
+                <span className="text-[9px] text-slate-500 font-semibold block pt-0.5">{formatDate(rev.created_at)}</span>
               </div>
             ))}
           </div>

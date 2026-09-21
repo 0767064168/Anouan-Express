@@ -41,6 +41,8 @@ const FavoritesPage      = lazy(() => import('./pages/client/FavoritesPage'));
 const ChatPage           = lazy(() => import('./pages/client/ChatPage'));
 const DisputesPage       = lazy(() => import('./pages/client/DisputesPage'));
 const LegalPage          = lazy(() => import('./pages/client/LegalPage'));
+const StoresPage         = lazy(() => import('./pages/client/StoresPage'));
+const OrdersHistoryPage  = lazy(() => import('./pages/client/OrdersHistoryPage'));
 
 // ─── Pages Admin (lazy) ───────────────────────────────────────
 const AdminDashboardPage = lazy(() => import('./pages/admin/AdminDashboardPage'));
@@ -51,6 +53,7 @@ const AdminFinancePage   = lazy(() => import('./pages/admin/AdminFinancePage'));
 const AdminContentPage   = lazy(() => import('./pages/admin/AdminContentPage'));
 const AdminMarketingPage = lazy(() => import('./pages/admin/AdminMarketingPage'));
 const AdminSettingsPage  = lazy(() => import('./pages/admin/AdminSettingsPage'));
+const AdminStoresPage    = lazy(() => import('./pages/admin/AdminStoresPage'));
 
 // ─── Pages Vendor (lazy) ──────────────────────────────────────
 const VendorLayout        = lazy(() => import('./pages/vendor/VendorLayout'));
@@ -129,10 +132,13 @@ function App() {
                 <Route path="/catalog/:categorySlug"    element={<CatalogPage />} />
                 <Route path="/products/:id"             element={<ProductDetailPage />} />
                 <Route path="/legal"                    element={<LegalPage />} />
+                <Route path="/stores"                   element={<StoresPage />} />
 
                 {/* Client authentifié */}
                 <Route element={<ProtectedRoute allowedRoles={['client', 'vendor', 'admin', 'agent']} />}>
                   <Route path="/checkout"                 element={<CheckoutPage />} />
+                  <Route path="/orders"                   element={<OrdersHistoryPage />} />
+                  <Route path="/orders/:id"               element={<OrderTrackingPage />} />
                   <Route path="/orders/:id/tracking"      element={<OrderTrackingPage />} />
                   <Route path="/profile"                  element={<ProfilePage />} />
                   <Route path="/notifications"            element={<NotificationsPage />} />
@@ -153,6 +159,7 @@ function App() {
                   <Route path="/admin/content"        element={<AdminContentPage />} />
                   <Route path="/admin/marketing"      element={<AdminMarketingPage />} />
                   <Route path="/admin/settings"       element={<AdminSettingsPage />} />
+                  <Route path="/admin/stores"         element={<AdminStoresPage />} />
                   <Route path="/admin/agent"          element={<PickupAgentPage />} />
                 </Route>
               </Route>

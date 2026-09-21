@@ -8,8 +8,8 @@
     "start": "node src/app.js",
     "test": "jest --runInBand",
     "db:setup": "node scripts/setup-db.js",
-    "migrate": "psql -U %DB_USER% -d %DB_NAME% -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql",
-    "migrate:unix": "psql -U $DB_USER -d $DB_NAME -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql"
+    "migrate": "psql -U %DB_USER% -d %DB_NAME% -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql -f migrations/005_add_account_and_dispute_fields.sql -f migrations/006_add_flash_sale_inventory.sql -f migrations/007_add_banner_updated_at.sql -f migrations/008_add_banner_display_fields.sql -f migrations/009_add_agent_store_assignment.sql -f migrations/010_add_message_attachments.sql",
+    "migrate:unix": "psql -U $DB_USER -d $DB_NAME -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql -f migrations/005_add_account_and_dispute_fields.sql -f migrations/006_add_flash_sale_inventory.sql -f migrations/007_add_banner_updated_at.sql -f migrations/008_add_banner_display_fields.sql -f migrations/009_add_agent_store_assignment.sql -f migrations/010_add_message_attachments.sql"
   },
   "keywords": [
     "ecommerce",
@@ -28,6 +28,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-rate-limit": "^8.6.1",
+    "firebase-admin": "^14.4.0",
     "helmet": "^8.3.0",
     "joi": "^18.2.3",
     "jsonwebtoken": "^9.0.3",
@@ -37,6 +38,8 @@
     "pdfkit": "^0.19.1",
     "pg": "^8.22.0",
     "qrcode": "^1.5.4",
+    "sharp": "^0.35.4",
+    "socket.io": "^4.8.3",
     "uuid": "^14.0.1"
   },
   "devDependencies": {

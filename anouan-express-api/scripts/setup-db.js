@@ -114,6 +114,46 @@ async function runSetup() {
       console.log('✅ Migration 004 appliquée avec succès !');
     }
 
+    const migration005Path = path.join(__dirname, '../migrations/005_add_account_and_dispute_fields.sql');
+    if (fs.existsSync(migration005Path)) {
+      console.log('🧩 Application des champs complémentaires (005_add_account_and_dispute_fields.sql)...');
+      const sql005 = fs.readFileSync(migration005Path, 'utf8');
+      await client.query(sql005);
+      console.log('✅ Migration 005 appliquée avec succès !');
+    }
+
+    const migration006Path = path.join(__dirname, '../migrations/006_add_flash_sale_inventory.sql');
+    if (fs.existsSync(migration006Path)) {
+      console.log('📦 Application du stock et de l’image des ventes flash (006_add_flash_sale_inventory.sql)...');
+      const sql006 = fs.readFileSync(migration006Path, 'utf8');
+      await client.query(sql006);
+      console.log('✅ Migration 006 appliquée avec succès !');
+    }
+
+    const migration007Path = path.join(__dirname, '../migrations/007_add_banner_updated_at.sql');
+    if (fs.existsSync(migration007Path)) {
+      console.log('🕒 Application du timestamp des bannières (007_add_banner_updated_at.sql)...');
+      const sql007 = fs.readFileSync(migration007Path, 'utf8');
+      await client.query(sql007);
+      console.log('✅ Migration 007 appliquée avec succès !');
+    }
+
+    const migration008Path = path.join(__dirname, '../migrations/008_add_banner_display_fields.sql');
+    if (fs.existsSync(migration008Path)) {
+      console.log('🎨 Application des champs d’affichage des bannières (008_add_banner_display_fields.sql)...');
+      const sql008 = fs.readFileSync(migration008Path, 'utf8');
+      await client.query(sql008);
+      console.log('✅ Migration 008 appliquée avec succès !');
+    }
+
+    const migration009Path = path.join(__dirname, '../migrations/009_add_agent_store_assignment.sql');
+    if (fs.existsSync(migration009Path)) {
+      console.log('📍 Application de l’affectation des Agents aux points relais (009_add_agent_store_assignment.sql)...');
+      const sql009 = fs.readFileSync(migration009Path, 'utf8');
+      await client.query(sql009);
+      console.log('✅ Migration 009 appliquée avec succès !');
+    }
+
     client.release();
     console.log('🎉 Initialisation de la base de données terminée avec succès.');
     process.exit(0);

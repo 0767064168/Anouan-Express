@@ -188,11 +188,17 @@ export default function VendorFinancePage() {
                       <p className="font-black text-white">#{tx.id}</p>
                       <p className="text-[10px] text-slate-400 font-bold mt-0.5">{formatDate(tx.created_at)}</p>
                     </td>
-                    <td className="px-6 py-4 text-slate-300 text-xs capitalize">{tx.method || 'Mobile Money'}</td>
-                    <td className="px-6 py-4 font-black text-orange-500 text-xs">{formatPrice(tx.amount)}</td>
+                    <td className="px-6 py-4 text-slate-300 text-xs capitalize">{tx.payout_method || tx.method || 'Mobile Money'}</td>
+                    <td className="px-6 py-4 font-black text-orange-500 text-xs">{formatPrice(tx.amount_due ?? tx.amount ?? tx.amount_paid ?? 0)}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block ${tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'}`}>
-                        {tx.status === 'completed' ? 'Payé' : 'En traitement'}
+                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border inline-block ${
+                        tx.status === 'paid' || tx.status === 'completed'
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : tx.status === 'rejected'
+                          ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                          : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+                      }`}>
+                        {tx.status === 'paid' || tx.status === 'completed' ? 'Payé' : tx.status === 'rejected' ? 'Rejeté' : 'En attente'}
                       </span>
                     </td>
                   </tr>

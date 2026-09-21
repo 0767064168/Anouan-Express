@@ -201,14 +201,10 @@ const create = async (vendorId, data) => {
     const numPrice = Number(price) || 0;
     const numStock = Number(stock) || 0;
 
-    // Résolution sécurisée du vendorId
-    let effectiveVendorId = vendorId;
-    const vCheck = await client.query('SELECT id FROM vendors WHERE id = $1', [effectiveVendorId]).catch(() => ({ rows: [] }));
+    const effectiveVendorId = vendorId;
+    const vCheck = await client.query('SELECT id FROM vendors WHERE id = $1', [effectiveVendorId]);
     if (!vCheck.rows.length) {
-      const vFirst = await client.query('SELECT id FROM vendors LIMIT 1');
-      if (vFirst.rows.length) {
-        effectiveVendorId = vFirst.rows[0].id;
-      }
+      throw new AppError('Vendeur introuvable.', 404, 'VENDOR_NOT_FOUND');
     }
 
     // Résolution sécurisée du categoryId (si non-UUID ou inexistant)

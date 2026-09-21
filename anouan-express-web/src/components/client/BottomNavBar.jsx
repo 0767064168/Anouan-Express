@@ -2,7 +2,7 @@
 // Barre de navigation fixe en bas - visible uniquement mobile (< lg)
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, LayoutGrid, ShoppingCart, User, Heart } from "lucide-react";
+import { Home, LayoutGrid, ShoppingCart, User, Package } from "lucide-react";
 import { useCart } from "../../contexts/CartContext";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -14,8 +14,8 @@ export default function BottomNavBar({ onCartOpen }) {
   const tabs = [
     { label: "Accueil",   path: "/",                                        icon: Home },
     { label: "Catalogue", path: "/catalog",                                  icon: LayoutGrid },
+    { label: "Commandes", path: isAuthenticated ? "/orders" : "/auth/login", icon: Package },
     { label: "Panier",    path: null,                                        icon: ShoppingCart, action: onCartOpen, badge: totalItems },
-    { label: "Favoris",   path: "/favorites",                                icon: Heart },
     { label: "Compte",    path: isAuthenticated ? "/profile" : "/auth/login", icon: User },
   ];
 

@@ -8,8 +8,10 @@ const { createOrderSchema, updateItemStatusSchema } = require('./orders.validati
 
 router.post('/', authenticate, authorize('client', 'admin', 'vendor'), validate({ body: createOrderSchema }), ordersController.createOrder);
 router.get('/my', authenticate, authorize('client', 'admin'), ordersController.getMyOrders);
+router.get('/my/stats', authenticate, authorize('client', 'admin'), ordersController.getMyStats);
 router.get('/vendor', authenticate, authorize('vendor', 'admin'), ordersController.getVendorOrders);
 router.get('/', authenticate, authorize('admin', 'agent'), ordersController.getAllOrders);
+router.patch('/:id/delegate', authenticate, authorize('client', 'admin'), ordersController.setDelegate);
 router.get('/:id', authenticate, ordersController.getOrderById);
 router.patch('/:id/status', authenticate, authorize('admin', 'agent', 'vendor'), ordersController.updateOrderStatus);
 router.put('/:id/items/:itemId/status', authenticate, authorize('vendor', 'admin'), validate({ body: updateItemStatusSchema }), ordersController.updateItemStatus);

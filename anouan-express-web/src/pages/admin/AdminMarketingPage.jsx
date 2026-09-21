@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Megaphone, Plus, Trash2, Zap, Tag, X, Image, Calendar, Palette, ImagePlus, Pause, Play, Save, Package, Coins, Timer, BarChart3, Settings, BadgePercent } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader';
-import { adminAPI } from '../../services/api';
+import { adminAPI, productsAPI } from '../../services/api';
 
 const initialBanners = [
   {
@@ -79,6 +79,7 @@ export default function AdminMarketingPage() {
   const [banners, setBanners] = useState([]);
   const [flashSales, setFlashSales] = useState(initialFlash);
   const [loading, setLoading] = useState(true);
+  const [editingBannerId, setEditingBannerId] = useState(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -89,15 +90,18 @@ export default function AdminMarketingPage() {
         setBanners(bData.map((b) => ({
           id: b.id,
           title: b.title,
-          subtitle: b.link_url || 'Offre exclusive',
-          badge: '⚡ Annonce Officielle',
-          color: 'from-orange-500 to-amber-500',
+          subtitle: b.subtitle || 'Offre exclusive',
+          linkUrl: b.link_url || '',
+          badge: b.badge || '⚡ Annonce Officielle',
+          color: b.theme_color || 'from-orange-500 to-amber-500',
           active: b.is_active !== false,
-          productName: b.title,
+          productName: b.product_name || b.title,
           productImage: b.image_url || 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80',
-          productPrice: 25000,
-          productOldPrice: 35000,
-          category: 'mode',
+          startsAt: b.starts_at,
+          endsAt: b.ends_at,
+          productPrice: Number(b.product_price || 25000),
+          productOldPrice: Number(b.product_old_price || 35000),
+          category: b.category || 'mode',
         })));
       } else {
         setBanners([]);
@@ -116,7 +120,10 @@ export default function AdminMarketingPage() {
           originalPrice: Number(f.flash_price ? f.flash_price * 1.3 : 30000),
           salePrice: Number(f.flash_price || 20000),
           endsAt: f.ends_at,
-          stock: 10,
+          startsAt: f.starts_at,
+          stock: Number(f.stock || 0),
+          image: f.image_url || '',
+          active: f.is_active !== false,
         })));
       } else {
         setFlashSales([]);
@@ -133,6 +140,8 @@ export default function AdminMarketingPage() {
 
   const [showBannerForm, setShowBannerForm] = useState(false);
   const [showFlashForm, setShowFlashForm] = useState(false);
+  const [editingFlashId, setEditingFlashId] = useState(null);
+  const [bannerActionId, setBannerActionId] = useState(null);
   const [newBanner, setNewBanner] = useState({
     title: '',
     subtitle: '',
@@ -143,28 +152,38 @@ export default function AdminMarketingPage() {
     productOldPrice: '',
     productImage: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80',
     category: 'mode',
+    startsAt: '',
+    endsAt: '',
   });
   const [newFlash, setNewFlash] = useState({
-    name: '',
-    originalPrice: '',
-    salePrice: '',
-    endsAt: '2026-09-30',
-    stock: 10,
-    image: '',
+    startsAt: '',
+    endsAt: '2026-09-30T23:59',
   });
+  const [flashProducts, setFlashProducts] = useState([
+    { name: '', originalPrice: '', salePrice: '', stock: 10, image: '' },
+  ]);
 
   const toggleBanner = async (id) => {
+    const currentBanner = banners.find((banner) => banner.id === id);
+    const nextActive = !currentBanner?.active;
+    setBannerActionId(id);
+    setBanners(prev => prev.map(b => b.id === id ? { ...b, active: nextActive } : b));
     try {
       const response = await adminAPI.toggleBanner(id);
       const banner = response.data?.data || response.data;
       setBanners(prev => prev.map(b => b.id === id ? { ...b, active: banner?.is_active !== false } : b));
       window.dispatchEvent(new Event('anouan_banners_updated'));
     } catch (error) {
+      setBanners(prev => prev.map(b => b.id === id ? { ...b, active: !nextActive } : b));
       console.error('Erreur activation bannière:', error);
+      alert(error?.response?.data?.error?.message || 'Impossible de modifier le statut de la bannière.');
+    } finally {
+      setBannerActionId(null);
     }
   };
 
   const deleteBanner = async (id) => {
+    if (!window.confirm('Supprimer définitivement cette bannière ?')) return;
     try {
       await adminAPI.deleteBanner(id);
       setBanners(prev => prev.filter(b => b.id !== id));
@@ -172,6 +191,24 @@ export default function AdminMarketingPage() {
     } catch (error) {
       console.error('Erreur suppression bannière:', error);
     }
+  };
+
+  const editBanner = (banner) => {
+    setEditingBannerId(banner.id);
+    setNewBanner({
+      title: banner.title || '',
+      subtitle: banner.subtitle || '',
+      badge: banner.badge || '⚡ Annonce Officielle',
+      color: banner.color || 'from-orange-500 to-amber-500',
+      productName: banner.productName || '',
+      productPrice: banner.productPrice || '',
+      productOldPrice: banner.productOldPrice || '',
+      productImage: banner.productImage || '',
+      category: banner.category || 'mode',
+      startsAt: banner.startsAt ? new Date(banner.startsAt).toISOString().slice(0, 16) : '',
+      endsAt: banner.endsAt ? new Date(banner.endsAt).toISOString().slice(0, 16) : '',
+    });
+    setShowBannerForm(true);
   };
 
   const deleteFlash = async (id) => {
@@ -184,32 +221,120 @@ export default function AdminMarketingPage() {
     }
   };
 
-  const addFlash = () => {
-    if (!newFlash.name || !newFlash.salePrice) return;
-    const itemToAdd = {
-      id: `F-${Date.now()}`,
-      name: newFlash.name,
-      originalPrice: Number(newFlash.originalPrice || newFlash.salePrice * 1.3),
-      salePrice: Number(newFlash.salePrice),
-      endsAt: newFlash.endsAt || '2026-09-30',
-      stock: Number(newFlash.stock || 5),
-      image: newFlash.image || 'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=600&q=80',
-    };
-    const updated = [itemToAdd, ...flashSales];
-    saveFlashSales(updated);
-    setNewFlash({ name: '', originalPrice: '', salePrice: '', endsAt: '2026-09-30', stock: 10, image: '' });
-    setShowFlashForm(false);
+  const toggleFlash = async (id) => {
+    try {
+      const response = await adminAPI.toggleFlashSale(id);
+      const flashSale = response.data?.data || response.data;
+      setFlashSales(prev => prev.map(f => f.id === id
+        ? { ...f, active: flashSale?.is_active !== false }
+        : f));
+      window.dispatchEvent(new Event('anouan_flash_sales_updated'));
+    } catch (error) {
+      console.error('Erreur activation flash sale:', error);
+      alert('Impossible de modifier le statut de la vente flash.');
+    }
+  };
+
+  const addFlash = async () => {
+    if (flashProducts.some((product) => !product.name || !product.salePrice)) return;
+
+    try {
+      const startsAtDate = newFlash.startsAt ? new Date(newFlash.startsAt) : new Date();
+      const endsAtDate = newFlash.endsAt ? new Date(newFlash.endsAt) : new Date(Date.now() + 86400000);
+      if (Number.isNaN(startsAtDate.getTime()) || Number.isNaN(endsAtDate.getTime()) || endsAtDate <= startsAtDate) {
+        alert('La date et l’heure de fin doivent être postérieures au début.');
+        return;
+      }
+
+      if (!editingFlashId) {
+        const productsRes = await productsAPI.getAll({ limit: 100 });
+        const products = productsRes?.data?.data || productsRes?.data || [];
+        const payloadProducts = flashProducts.map((product) => {
+          const selectedProduct = products.find((candidate) => {
+            const name = (candidate.title || candidate.name || '').toLowerCase();
+            return name.includes(product.name.trim().toLowerCase());
+          });
+          if (!selectedProduct?.id) throw new Error(`Produit introuvable : ${product.name}`);
+          const originalPrice = Number(product.originalPrice || selectedProduct.price || product.salePrice * 1.3);
+          const salePrice = Number(product.salePrice);
+          return {
+            productId: selectedProduct.id,
+            discountPercent: Math.max(1, Math.min(99, Math.round((1 - salePrice / originalPrice) * 100))),
+            flashPrice: salePrice,
+            stock: Number(product.stock || 0),
+            imageUrl: product.image.trim() || null,
+          };
+        });
+        await adminAPI.createFlashSales({
+          products: payloadProducts,
+          startsAt: startsAtDate.toISOString(),
+          endsAt: endsAtDate.toISOString(),
+        });
+      } else {
+        const product = flashProducts[0];
+        const originalPrice = Number(product.originalPrice || product.salePrice * 1.3);
+        const salePrice = Number(product.salePrice);
+        await adminAPI.updateFlashSale(editingFlashId, {
+          discountPercent: Math.max(1, Math.min(99, Math.round((1 - salePrice / originalPrice) * 100))),
+          flashPrice: salePrice,
+          stock: Number(product.stock || 0),
+          imageUrl: product.image.trim() || null,
+          startsAt: startsAtDate.toISOString(),
+          endsAt: endsAtDate.toISOString(),
+        });
+      }
+
+      await loadData();
+      setNewFlash({ startsAt: '', endsAt: '2026-09-30T23:59' });
+      setFlashProducts([{ name: '', originalPrice: '', salePrice: '', stock: 10, image: '' }]);
+      setEditingFlashId(null);
+      setShowFlashForm(false);
+      window.dispatchEvent(new Event('anouan_flash_sales_updated'));
+    } catch (error) {
+      console.error('Erreur création flash sale:', error);
+      alert(error?.response?.data?.error?.message || 'Impossible de créer la vente flash.');
+    }
+  };
+
+  const editFlash = (flashSale) => {
+    setEditingFlashId(flashSale.id);
+    setNewFlash({
+      startsAt: flashSale.startsAt ? new Date(flashSale.startsAt).toISOString().slice(0, 16) : '',
+      endsAt: flashSale.endsAt ? new Date(flashSale.endsAt).toISOString().slice(0, 16) : '',
+    });
+    setFlashProducts([{ name: flashSale.name, originalPrice: flashSale.originalPrice, salePrice: flashSale.salePrice, stock: flashSale.stock, image: flashSale.image || '' }]);
+    setShowFlashForm(true);
   };
 
   const addBanner = async () => {
     if (!newBanner.title) return;
+    const startsAt = newBanner.startsAt ? new Date(newBanner.startsAt) : null;
+    const endsAt = newBanner.endsAt ? new Date(newBanner.endsAt) : null;
+    if ((startsAt && Number.isNaN(startsAt.getTime())) || (endsAt && Number.isNaN(endsAt.getTime())) || (startsAt && endsAt && endsAt <= startsAt)) {
+      alert('La fin de diffusion doit être postérieure au début.');
+      return;
+    }
     try {
-      await adminAPI.createBanner({
+      const payload = {
         title: newBanner.title,
         imageUrl: newBanner.productImage || 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80',
         linkUrl: `/catalog?cat=${newBanner.category || 'mode'}`,
         position: banners.length + 1,
-      });
+        subtitle: newBanner.subtitle,
+        badge: newBanner.badge,
+        themeColor: newBanner.color,
+        productName: newBanner.productName,
+        productPrice: newBanner.productPrice || null,
+        productOldPrice: newBanner.productOldPrice || null,
+        category: newBanner.category,
+        startsAt: startsAt?.toISOString() || null,
+        endsAt: endsAt?.toISOString() || null,
+      };
+      if (editingBannerId) {
+        await adminAPI.updateBanner(editingBannerId, payload);
+      } else {
+        await adminAPI.createBanner(payload);
+      }
       await loadData();
     } catch (e) {
       alert('Erreur enregistrement de la bannière.');
@@ -224,6 +349,8 @@ export default function AdminMarketingPage() {
       productOldPrice: '',
       productImage: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80',
       category: 'mode',
+      startsAt: '',
+      endsAt: '',
     });
     setShowBannerForm(false);
   };
@@ -247,7 +374,11 @@ export default function AdminMarketingPage() {
               <p className="text-[11px] text-slate-400">Chaque bannière affiche son produit vedette et filtre le catalogue au clic.</p>
             </div>
           </div>
-          <button onClick={() => setShowBannerForm(true)}
+          <button onClick={() => {
+            setEditingBannerId(null);
+            setNewBanner({ title: '', subtitle: '', badge: '⚡ Annonce Officielle', color: 'from-orange-500 to-amber-500', productName: '', productPrice: '', productOldPrice: '', productImage: 'https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800&q=80', category: 'mode', startsAt: '', endsAt: '' });
+            setShowBannerForm(true);
+          }}
             className="flex items-center gap-1.5 px-3 py-2 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">
             <Plus size={13}/> Nouvelle bannière
           </button>
@@ -256,7 +387,7 @@ export default function AdminMarketingPage() {
         {showBannerForm && (
           <div className="bg-slate-900/90 border border-orange-500/30 rounded-3xl p-5 mb-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">Créer une Bannière avec Produit Vedette</p>
+              <p className="text-xs font-black text-orange-400 uppercase tracking-wider">{editingBannerId ? 'Modifier la bannière' : 'Créer une Bannière avec Produit Vedette'}</p>
               <button onClick={() => setShowBannerForm(false)} className="text-slate-500 hover:text-white">
                 <X size={16} />
               </button>
@@ -374,9 +505,30 @@ export default function AdminMarketingPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="text-[11px] font-bold text-slate-400">
+                Début de diffusion
+                <input
+                  type="datetime-local"
+                  value={newBanner.startsAt}
+                  onChange={(e) => setNewBanner(p => ({ ...p, startsAt: e.target.value }))}
+                  className="mt-1.5 w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-orange-500 outline-none"
+                />
+              </label>
+              <label className="text-[11px] font-bold text-slate-400">
+                Fin de diffusion
+                <input
+                  type="datetime-local"
+                  value={newBanner.endsAt}
+                  onChange={(e) => setNewBanner(p => ({ ...p, endsAt: e.target.value }))}
+                  className="mt-1.5 w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-orange-500 outline-none"
+                />
+              </label>
+            </div>
+
             <div className="flex gap-2 pt-2">
-              <button onClick={addBanner} className="flex items-center gap-1.5 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><ImagePlus size={14} /> Créer la bannière</button>
-              <button onClick={() => setShowBannerForm(false)} className="px-4 py-2.5 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
+              <button onClick={addBanner} className="flex items-center gap-1.5 px-5 py-2.5 bg-orange-500 text-white text-xs font-bold rounded-2xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20"><ImagePlus size={14} /> {editingBannerId ? 'Mettre à jour' : 'Créer la bannière'}</button>
+              <button onClick={() => { setShowBannerForm(false); setEditingBannerId(null); }} className="px-4 py-2.5 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
             </div>
           </div>
         )}
@@ -399,9 +551,14 @@ export default function AdminMarketingPage() {
                       </span>
                     )}
                   </div>
-                  <button onClick={() => deleteBanner(banner.id)} className="p-1.5 bg-black/20 hover:bg-black/40 rounded-xl transition-colors">
-                    <Trash2 size={13} className="text-white/70"/>
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => editBanner(banner)} className="p-1.5 bg-black/20 hover:bg-black/40 rounded-xl transition-colors" title="Modifier">
+                      <Settings size={13} className="text-white/70"/>
+                    </button>
+                    <button onClick={() => deleteBanner(banner.id)} className="p-1.5 bg-black/20 hover:bg-black/40 rounded-xl transition-colors" title="Supprimer">
+                      <Trash2 size={13} className="text-white/70"/>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Titre & Sous-titre */}
@@ -409,6 +566,11 @@ export default function AdminMarketingPage() {
                   <h3 className="text-base font-black text-white leading-tight">{banner.title}</h3>
                   <p className="text-white/80 text-xs mt-0.5">{banner.subtitle}</p>
                 </div>
+                <p className="text-[10px] text-white/60">
+                  Diffusion : {banner.startsAt ? new Date(banner.startsAt).toLocaleString('fr-FR') : 'immédiate'}
+                  {' - '}
+                  {banner.endsAt ? new Date(banner.endsAt).toLocaleString('fr-FR') : 'sans expiration'}
+                </p>
 
                 {/* Preview Produit intégré */}
                 {banner.productName && (
@@ -433,9 +595,9 @@ export default function AdminMarketingPage() {
 
               {/* Bouton bascule Activer/Désactiver */}
               <div className="relative z-10 pt-4">
-                <button onClick={() => toggleBanner(banner.id)}
-                  className="w-full py-2 bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold rounded-xl transition-colors border border-white/20 shadow-sm">
-                  <span className="flex items-center justify-center gap-1.5">{banner.active ? <Pause size={13} /> : <Play size={13} />}{banner.active ? 'Désactiver du site' : 'Activer sur le site'}</span>
+                <button onClick={() => toggleBanner(banner.id)} disabled={bannerActionId === banner.id}
+                  className="w-full py-2 bg-white/20 hover:bg-white/30 text-white text-[11px] font-bold rounded-xl transition-colors border border-white/20 shadow-sm disabled:opacity-50 disabled:cursor-wait">
+                  <span className="flex items-center justify-center gap-1.5">{bannerActionId === banner.id ? 'Mise à jour...' : <>{banner.active ? <Pause size={13} /> : <Play size={13} />}{banner.active ? 'Désactiver du site' : 'Activer sur le site'}</>}</span>
                 </button>
               </div>
             </div>
@@ -450,7 +612,12 @@ export default function AdminMarketingPage() {
             <div className="p-1.5 bg-red-500/20 rounded-xl"><Zap size={14} className="text-red-400"/></div>
             <h2 className="text-sm font-black text-white">Ventes Flash</h2>
           </div>
-          <button onClick={() => setShowFlashForm(true)}
+          <button onClick={() => {
+            setEditingFlashId(null);
+            setNewFlash({ startsAt: '', endsAt: '2026-09-30T23:59' });
+            setFlashProducts([{ name: '', originalPrice: '', salePrice: '', stock: 10, image: '' }]);
+            setShowFlashForm(true);
+          }}
             className="flex items-center gap-1.5 px-3 py-2 bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-bold rounded-2xl hover:bg-red-500/20 transition-colors">
             <Plus size={13}/> Ajouter
           </button>
@@ -458,53 +625,46 @@ export default function AdminMarketingPage() {
 
         {showFlashForm && (
           <div className="bg-slate-900/80 border border-red-500/30 rounded-3xl p-5 mb-4 space-y-3">
-            <p className="text-xs font-black text-red-400 uppercase tracking-wider">Nouveau produit en vente flash</p>
-            <input
-              value={newFlash.name}
-              onChange={(e) => setNewFlash(p => ({ ...p, name: e.target.value }))}
-              placeholder="Nom du produit (ex: iPhone 15 Pro, Sneakers...)"
-              className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
-            />
+            <p className="text-xs font-black text-red-400 uppercase tracking-wider">{editingFlashId ? 'Modifier la vente flash' : 'Nouveau produit en vente flash'}</p>
+            {flashProducts.map((product, index) => (
+              <div key={index} className="border border-slate-800 rounded-2xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase text-slate-500">Produit {index + 1}</span>
+                  {!editingFlashId && flashProducts.length > 1 && (
+                    <button type="button" onClick={() => setFlashProducts(prev => prev.filter((_, itemIndex) => itemIndex !== index))} className="text-red-400 hover:text-red-300" title="Retirer ce produit"><X size={14} /></button>
+                  )}
+                </div>
+                <input
+                  value={product.name}
+                  onChange={(e) => setFlashProducts(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, name: e.target.value } : item))}
+                  placeholder="Nom du produit (ex: iPhone 15 Pro, Sneakers...)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input type="number" value={product.originalPrice} onChange={(e) => setFlashProducts(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, originalPrice: e.target.value } : item))} placeholder="Prix original (FCFA)" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none" />
+                  <input type="number" value={product.salePrice} onChange={(e) => setFlashProducts(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, salePrice: e.target.value } : item))} placeholder="Prix promo (FCFA)" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none" />
+                  <input type="number" value={product.stock} onChange={(e) => setFlashProducts(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, stock: e.target.value } : item))} placeholder="Stock" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none" />
+                </div>
+                <input value={product.image} onChange={(e) => setFlashProducts(prev => prev.map((item, itemIndex) => itemIndex === index ? { ...item, image: e.target.value } : item))} placeholder="URL de l'image (optionnel)" className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none" />
+              </div>
+            ))}
+            {!editingFlashId && (
+              <button type="button" onClick={() => setFlashProducts(prev => [...prev, { name: '', originalPrice: '', salePrice: '', stock: 10, image: '' }])} className="inline-flex items-center gap-1.5 px-3 py-2 border border-red-500/30 text-red-400 rounded-xl text-xs font-bold hover:bg-red-500/10">
+                <Plus size={13} /> Ajouter un autre produit
+              </button>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="datetime-local" value={newFlash.startsAt} onChange={(e) => setNewFlash(p => ({ ...p, startsAt: e.target.value }))} className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white focus:border-red-500 outline-none" />
               <input
-                type="number"
-                value={newFlash.originalPrice}
-                onChange={(e) => setNewFlash(p => ({ ...p, originalPrice: e.target.value }))}
-                placeholder="Prix original (FCFA)"
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
-              />
-              <input
-                type="number"
-                value={newFlash.salePrice}
-                onChange={(e) => setNewFlash(p => ({ ...p, salePrice: e.target.value }))}
-                placeholder="Prix flash / promo (FCFA)"
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
-              />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input
-                type="date"
+                type="datetime-local"
                 value={newFlash.endsAt}
                 onChange={(e) => setNewFlash(p => ({ ...p, endsAt: e.target.value }))}
                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
               />
-              <input
-                type="number"
-                value={newFlash.stock}
-                onChange={(e) => setNewFlash(p => ({ ...p, stock: e.target.value }))}
-                placeholder="Stock disponible"
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
-              />
-              <input
-                value={newFlash.image}
-                onChange={(e) => setNewFlash(p => ({ ...p, image: e.target.value }))}
-                placeholder="URL de l'image (optionnel)"
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:border-red-500 outline-none"
-              />
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={addFlash} className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-2xl hover:bg-red-600 transition-colors"><Save size={14} /> Enregistrer</button>
-              <button onClick={() => setShowFlashForm(false)} className="px-4 py-2 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
+              <button onClick={addFlash} className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-2xl hover:bg-red-600 transition-colors"><Save size={14} /> {editingFlashId ? 'Mettre à jour' : 'Enregistrer'}</button>
+              <button onClick={() => { setShowFlashForm(false); setEditingFlashId(null); }} className="px-4 py-2 text-slate-400 text-xs font-bold hover:bg-slate-800 rounded-2xl transition-colors">Annuler</button>
             </div>
           </div>
         )}
@@ -538,6 +698,13 @@ export default function AdminMarketingPage() {
                   </td>
                   <td className="px-5 py-4 text-slate-300">{f.stock} unités</td>
                   <td className="px-5 py-4 text-right">
+                    <button onClick={() => toggleFlash(f.id)}
+                      className={`mr-2 px-2 py-1 rounded-lg text-[10px] font-bold border ${f.active ? 'text-amber-400 border-amber-500/25 hover:bg-amber-500/10' : 'text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/10'}`}>
+                      {f.active ? 'Désactiver' : 'Activer'}
+                    </button>
+                    <button onClick={() => editFlash(f)} className="mr-2 p-1.5 text-sky-400 hover:bg-sky-500/10 rounded-xl transition-colors" title="Modifier">
+                      <Settings size={14}/>
+                    </button>
                     <button onClick={() => deleteFlash(f.id)} className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-xl transition-colors">
                       <Trash2 size={14}/>
                     </button>

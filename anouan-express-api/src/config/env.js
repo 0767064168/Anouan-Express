@@ -9,9 +9,26 @@ const required = (key) => {
 };
 
 const optional = (key, defaultVal = '') => process.env[key] || defaultVal;
-const appEnv = optional('NODE_ENV', 'development');
+const isJestRuntime = !!process.env.JEST_WORKER_ID;
+const appEnv = isJestRuntime ? 'test' : optional('NODE_ENV', 'development');
 const jwtSecret = optional('JWT_SECRET', 'dev_only_change_me_32_characters_minimum');
 const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'dev_only_refresh_change_me_32_chars');
+const defaultAllowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:4173',
+  'http://localhost:4174',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:4174',
+  'http://127.0.0.1:5173',
+  'http://192.168.11.40:3000',
+  'http://192.168.11.40:4173',
+  'http://192.168.11.40:4174',
+  'http://192.168.11.40:5173',
+  'capacitor://localhost',
+  'http://localhost',
+];
 
 if (appEnv === 'production') {
   const invalidSecret = (value) => value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme');
@@ -101,8 +118,12 @@ module.exports = {
   },
 
   cors: {
-    origins: optional('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173')
-      .split(',')
-      .map((o) => o.trim()),
+    origins: [...new Set([
+      ...optional('ALLOWED_ORIGINS', defaultAllowedOrigins.join(','))
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean),
+      ...defaultAllowedOrigins,
+    ])],
   },
 };

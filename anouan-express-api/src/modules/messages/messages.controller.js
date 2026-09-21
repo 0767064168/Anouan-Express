@@ -24,7 +24,15 @@ class MessagesController {
 
   async sendMessage(req, res, next) {
     try {
-      const message = await messagesService.sendMessage(req.user.id, req.body);
+      const messageData = {
+        ...req.body,
+        ...(req.file && {
+          attachmentUrl: `/uploads/messages/${req.file.filename}`,
+          attachmentType: req.file.mimetype,
+          attachmentName: req.file.originalname,
+        }),
+      };
+      const message = await messagesService.sendMessage(req.user.id, messageData);
       res.status(201).json({ success: true, data: message });
     } catch (err) {
       next(err);

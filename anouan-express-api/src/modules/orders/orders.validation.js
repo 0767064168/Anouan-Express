@@ -11,7 +11,8 @@ const createOrderSchema = Joi.object({
       variantId: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow(null, ''),
       quantity: Joi.number().integer().min(1).required()
     })
-  ).min(1).required()
+  ).min(1).required(),
+  loyaltyPointsUsed: Joi.number().integer().min(0).optional()
 });
 
 const paginationSchema = Joi.object({

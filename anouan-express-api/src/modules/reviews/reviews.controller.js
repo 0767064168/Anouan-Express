@@ -4,7 +4,19 @@ class ReviewsController {
   async submitReview(req, res, next) {
     try {
       const clientId = req.user.id;
-      const reviewData = req.body;
+      const reviewData = { ...req.body };
+
+      // Si des images ont été uploadées via Multer
+      if (req.files && req.files.length) {
+        reviewData.images = req.files.map((file) => `/uploads/reviews/${file.filename}`);
+      } else if (typeof reviewData.images === 'string') {
+        try {
+          reviewData.images = JSON.parse(reviewData.images);
+        } catch {
+          reviewData.images = [reviewData.images];
+        }
+      }
+
       const review = await reviewsService.submitReview(clientId, reviewData);
       res.status(201).json({ success: true, data: review });
     } catch (err) {

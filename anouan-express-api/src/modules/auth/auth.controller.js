@@ -29,7 +29,13 @@ const register = async (req, res, next) => {
   try {
     const data = await authService.register(req.body);
     setAuthCookies(res, data);
-    res.status(201).json({ success: true, data: withoutTokens(data) });
+    res.status(201).json({
+      success: true,
+      data: {
+        ...withoutTokens(data),
+        accessToken: data.accessToken,
+      },
+    });
   } catch (err) { next(err); }
 };
 
@@ -37,7 +43,13 @@ const login = async (req, res, next) => {
   try {
     const data = await authService.loginWithPassword(req.body);
     setAuthCookies(res, data);
-    res.json({ success: true, data: withoutTokens(data) });
+    res.json({
+      success: true,
+      data: {
+        ...withoutTokens(data),
+        accessToken: data.accessToken,
+      },
+    });
   } catch (err) { next(err); }
 };
 

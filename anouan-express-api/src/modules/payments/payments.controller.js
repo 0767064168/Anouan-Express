@@ -2,8 +2,8 @@ const paymentsService = require('./payments.service');
 
 exports.initiatePayment = async (req, res, next) => {
   try {
-    const { orderId, provider } = req.body;
-    const result = await paymentsService.initiatePayment(orderId, req.user.id, provider);
+    const { orderId, provider, phoneNumber } = req.body;
+    const result = await paymentsService.initiatePayment(orderId, req.user.id, provider, phoneNumber);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);
@@ -33,6 +33,24 @@ exports.getPaymentByOrder = async (req, res, next) => {
   try {
     const payment = await paymentsService.getPaymentByOrder(req.params.orderId);
     res.json({ success: true, data: payment });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getPaymentStatus = async (req, res, next) => {
+  try {
+    const payment = await paymentsService.getPaymentStatus(req.params.transactionId, req.user.id);
+    res.json({ success: true, data: payment });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.pollPayment = async (req, res, next) => {
+  try {
+    const result = await paymentsService.pollPaymentStatus(req.params.orderId);
+    res.json({ success: true, data: result });
   } catch (err) {
     next(err);
   }

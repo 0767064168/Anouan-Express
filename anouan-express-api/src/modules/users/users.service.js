@@ -3,7 +3,9 @@ const { AppError } = require('../../middlewares/errorHandler');
 
 const getMyProfile = async (userId) => {
   const result = await query(
-    'SELECT id, name, email, phone, role, status, avatar_url, created_at, updated_at FROM users WHERE id = $1',
+    `SELECT users.id, users.name, users.email, users.phone, users.role, users.status, users.avatar_url,
+        users.store_id, stores.name AS store_name, stores.city AS store_city, users.created_at, users.updated_at
+     FROM users LEFT JOIN stores ON stores.id = users.store_id WHERE users.id = $1`,
     [userId]
   );
   if (!result.rows[0]) throw new AppError('User not found', 404);
@@ -85,7 +87,11 @@ const getAllUsers = async (page = 1, limit = 20, filters = {}) => {
 
   const dataValues = [...values, limit, offset];
   const dataResult = await query(
-    `SELECT id, name, email, phone, role, status, avatar_url, created_at FROM users ${whereString} ORDER BY created_at DESC LIMIT $${index++} OFFSET $${index++}`,
+    `SELECT users.id, users.name, users.email, users.phone, users.role, users.status, users.avatar_url,
+        users.store_id, stores.name AS store_name, stores.city AS store_city, users.created_at
+     FROM users LEFT JOIN stores ON stores.id = users.store_id
+     ${whereString.replace(/\brole\b/g, 'users.role').replace(/\bstatus\b/g, 'users.status').replace(/\bname\b/g, 'users.name').replace(/\bemail\b/g, 'users.email').replace(/\bphone\b/g, 'users.phone')}
+     ORDER BY users.created_at DESC LIMIT $${index++} OFFSET $${index++}`,
     dataValues
   );
 
@@ -116,6 +122,26 @@ const updateUserStatus = async (userId, status, actorId) => {
   return result.rows[0];
 };
 
+const deleteUser = async (userId, actorId) => {
+  if (String(userId) === String(actorId)) {
+    throw new AppError('Vous ne pouvez pas supprimer votre propre compte.', 400, 'SELF_DELETE');
+  }
+
+  try {
+    const result = await query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, name, email, role',
+      [userId]
+    );
+    if (!result.rows[0]) throw new AppError('User not found', 404);
+    return result.rows[0];
+  } catch (err) {
+    if (err.code === '23503') {
+      throw new AppError('Ce compte possède des données liées et ne peut pas être supprimé. Suspendez-le plutôt.', 409, 'USER_HAS_DEPENDENCIES');
+    }
+    throw err;
+  }
+};
+
 const updateFcmToken = async (userId, fcmToken) => {
   await query('UPDATE users SET fcm_token = $1, updated_at = NOW() WHERE id = $2', [fcmToken, userId]);
   return { success: true };
@@ -127,5 +153,6 @@ module.exports = {
   getAllUsers,
   getUserById,
   updateUserStatus,
+  deleteUser,
   updateFcmToken
 };

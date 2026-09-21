@@ -5,7 +5,7 @@ const { pushNewOrderVendor, pushOrderCreated } = require('../../utils/pushNotifi
 const { generateInvoice, generateDeliverySlip } = require('../../utils/pdfGenerator');
 
 class OrdersService {
-  async createOrder(clientId, { storeId, paymentMethod, items }) {
+  async createOrder(clientId, { storeId, paymentMethod, items, loyaltyPointsUsed }) {
     return await withTransaction(async (client) => {
       let totalAmount = 0;
       const orderItemsToInsert = [];
@@ -15,10 +15,22 @@ class OrdersService {
         let product = null;
         // Recherche du produit par ID (UUID ou text)
         const { rows: products } = await client.query(`
-          SELECT p.*, v.id as vendor_id, v.user_id as vendor_user_id, u.phone as vendor_phone 
+             SELECT p.*, fs.id AS active_flash_sale_id,
+               fs.flash_price AS active_flash_price,
+               fs.stock AS active_flash_stock,
+                 v.id as vendor_id, v.user_id as vendor_user_id, u.phone as vendor_phone 
           FROM products p 
           JOIN vendors v ON p.vendor_id = v.id 
           LEFT JOIN users u ON v.user_id = u.id
+          LEFT JOIN LATERAL (
+            SELECT id, flash_price, stock
+            FROM flash_sales
+            WHERE product_id = p.id
+              AND is_active = true
+              AND NOW() BETWEEN starts_at AND ends_at
+            ORDER BY created_at DESC
+            LIMIT 1
+          ) fs ON true
           WHERE p.id::text = $1::text
         `, [String(item.productId)]);
 
@@ -27,10 +39,22 @@ class OrdersService {
         } else {
           // Fallback gracieux sur le premier produit actif disponible si ID non trouvé
           const { rows: fallbackProducts } = await client.query(`
-            SELECT p.*, v.id as vendor_id, v.user_id as vendor_user_id, u.phone as vendor_phone 
+                 SELECT p.*, fs.id AS active_flash_sale_id,
+                   fs.flash_price AS active_flash_price,
+                   fs.stock AS active_flash_stock,
+                   v.id as vendor_id, v.user_id as vendor_user_id, u.phone as vendor_phone 
             FROM products p 
             JOIN vendors v ON p.vendor_id = v.id 
             LEFT JOIN users u ON v.user_id = u.id
+            LEFT JOIN LATERAL (
+              SELECT id, flash_price, stock
+              FROM flash_sales
+              WHERE product_id = p.id
+                AND is_active = true
+                AND NOW() BETWEEN starts_at AND ends_at
+              ORDER BY created_at DESC
+              LIMIT 1
+            ) fs ON true
             WHERE p.status = 'active'
             LIMIT 1
           `);
@@ -45,10 +69,14 @@ class OrdersService {
         if (currentStock < item.quantity) {
           throw new AppError(`Stock insuffisant pour le produit "${product.title}"`, 400);
         }
+
+        if (product.active_flash_sale_id && Number(product.active_flash_stock) < item.quantity) {
+          throw new AppError(`Stock promotionnel insuffisant pour le produit "${product.title}"`, 400);
+        }
         
         let unitPrice = parseInt(product.price, 10);
-        if (product.flash_sale_active && product.flash_sale_price) {
-          unitPrice = parseInt(product.flash_sale_price, 10);
+        if (product.active_flash_price || (product.flash_sale_active && product.flash_sale_price)) {
+          unitPrice = parseInt(product.active_flash_price || product.flash_sale_price, 10);
         }
         
         const subtotal = unitPrice * item.quantity;
@@ -66,6 +94,17 @@ class OrdersService {
         uniqueVendors.add(JSON.stringify({ id: product.vendor_id, phone: product.vendor_phone, userId: product.vendor_user_id }));
         
         await client.query('UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2', [item.quantity, product.id]);
+        if (product.active_flash_sale_id) {
+          const flashStockUpdate = await client.query(
+            `UPDATE flash_sales
+             SET stock = stock - $1
+             WHERE id = $2 AND is_active = true AND stock >= $1`,
+            [item.quantity, product.active_flash_sale_id]
+          );
+          if (flashStockUpdate.rowCount !== 1) {
+            throw new AppError(`Stock promotionnel insuffisant pour le produit "${product.title}"`, 400);
+          }
+        }
       }
 
       // Normalisation du mode de paiement selon la contrainte DB: 'orange_money', 'mtn_momo', 'wave', 'pickup'
@@ -75,6 +114,18 @@ class OrdersService {
       else if (pm.includes('mtn')) dbPaymentMethod = 'mtn_momo';
       else if (pm.includes('wave')) dbPaymentMethod = 'wave';
       else if (pm === 'cash' || pm === 'pickup') dbPaymentMethod = 'pickup';
+
+      // ── Anouan Club : déduction des points de fidélité ──────────────
+      if (loyaltyPointsUsed && Number(loyaltyPointsUsed) > 0) {
+        const { rows: userRows } = await client.query('SELECT loyalty_points FROM users WHERE id = $1', [clientId]);
+        const userPoints = userRows[0]?.loyalty_points || 0;
+        const actualPointsToUse = Math.min(userPoints, Math.floor(Number(loyaltyPointsUsed)));
+        if (actualPointsToUse > 0) {
+          const discountFCFA = Math.floor(actualPointsToUse / 2);
+          totalAmount = Math.max(0, totalAmount - discountFCFA);
+          await client.query('UPDATE users SET loyalty_points = GREATEST(0, loyalty_points - $1) WHERE id = $2', [actualPointsToUse, clientId]);
+        }
+      }
 
       // Validation de la boutique de retrait (store_id doit être un UUID valide existant)
       let validStoreId = null;
@@ -316,6 +367,9 @@ class OrdersService {
     if (requestingUser.role === 'client' && order.client_id !== requestingUser.id) {
       throw new AppError('Unauthorized', 403);
     }
+    if (requestingUser.role === 'agent' && String(order.store_id) !== String(requestingUser.store_id)) {
+      throw new AppError('Cette commande n’est pas affectée à votre point relais.', 403, 'WRONG_STORE');
+    }
     if (requestingUser.role === 'vendor') {
       const hasVendorItem = (order.items || []).some(i => i.vendor_id === requestingUser.vendor_id);
       if (!hasVendorItem) throw new AppError('Unauthorized', 403);
@@ -330,6 +384,10 @@ class OrdersService {
       const { rows } = await client.query('SELECT * FROM orders WHERE id::text = $1::text', [String(orderId)]);
       if (!rows.length) throw new AppError('Commande introuvable', 404);
       const order = rows[0];
+
+      if (requestingUser.role === 'agent' && String(order.store_id) !== String(requestingUser.store_id)) {
+        throw new AppError('Cette commande n’est pas affectée à votre point relais.', 403, 'WRONG_STORE');
+      }
 
       // Mise à jour du statut de la commande
       const { rows: updatedRows } = await client.query(
@@ -369,7 +427,30 @@ class OrdersService {
         }
       } else if (newStatus === 'picked_up') {
         await client.query("UPDATE pickup_codes SET status = 'used', used_at = NOW() WHERE order_id = $1", [order.id]);
-      }
+
+        // ── Anouan Club : créditer les points de fidélité ──────────────
+        try {
+          const earnedPoints = Math.max(1, Math.floor((order.total_amount || 0) / 100));
+          const { rows: updatedUser } = await client.query(
+            'UPDATE users SET loyalty_points = COALESCE(loyalty_points, 0) + $1 WHERE id = $2 RETURNING loyalty_points',
+            [earnedPoints, order.client_id]
+          );
+          const newTotal = updatedUser[0]?.loyalty_points || 0;
+
+          // Notification DB
+          await client.query(`
+            INSERT INTO notifications (user_id, type, title, body, metadata)
+            VALUES ($1, 'loyalty_points_earned', $2, $3, $4)
+          `, [
+            order.client_id,
+            '🎉 Points Anouan Club crédités !',
+            `+${earnedPoints} points ajoutés — Solde : ${newTotal} pts (≈ ${Math.floor(newTotal / 2)} FCFA de réduction)`,
+            JSON.stringify({ orderId: order.id, earnedPoints, newTotal })
+          ]);
+        } catch (e) {
+          console.warn('[LOYALTY] Erreur crédit points:', e.message);
+        }
+      } // fin else if picked_up
 
       // Notification au client
       try {
@@ -384,7 +465,7 @@ class OrdersService {
         ]);
       } catch (e) {}
 
-      // Notification SSE temps réel
+      // Notification SSE et Socket.io temps réel
       try {
         const { sendNotification } = require('../notifications/sse');
         sendNotification(String(order.client_id), {
@@ -394,6 +475,37 @@ class OrdersService {
           orderId: order.id,
           status: newStatus,
         });
+      } catch (e) {}
+
+      try {
+        const { emitToUser, emitToOrder } = require('../../config/socket');
+        const eventData = {
+          orderId: order.id,
+          status: newStatus,
+          updatedAt: new Date().toISOString()
+        };
+        emitToUser(order.client_id, 'order_status_changed', eventData);
+        emitToOrder(order.id, 'order_status_changed', eventData);
+      } catch (e) {}
+
+      // Push FCM (notification native Android)
+      try {
+        const { sendPushNotification } = require('../../config/firebase');
+        const { rows: userRows } = await client.query('SELECT fcm_token FROM users WHERE id = $1', [order.client_id]);
+        const fcmToken = userRows[0]?.fcm_token;
+        const statusLabels = {
+          preparing: '🍳 En préparation',
+          ready_for_pickup: '📦 Prêt à récupérer !',
+          picked_up: '✅ Récupéré',
+          cancelled: '❌ Annulé',
+        };
+        const label = statusLabels[newStatus] || `Statut : ${newStatus}`;
+        await sendPushNotification(
+          fcmToken,
+          '📦 Commande mise à jour',
+          `${label} — Commande #${String(order.id).substring(0, 8).toUpperCase()}`,
+          { orderId: String(order.id), status: newStatus, type: 'order_status_changed' }
+        );
       } catch (e) {}
 
       return updatedOrder;
@@ -473,6 +585,65 @@ class OrdersService {
     const order = await this.getOrderById(orderId, { vendor_id: vendorId, role: 'vendor' });
     if (typeof generateDeliverySlip === 'function') return await generateDeliverySlip(order);
     return Buffer.from('%PDF-1.4 Mock Delivery Slip Data');
+  }
+
+  async getMyStats(clientId) {
+    // Total commandes et montant dépensé
+    const { rows: totalRows } = await query(`
+      SELECT
+        COUNT(*) AS total_orders,
+        COALESCE(SUM(total_amount), 0) AS total_spent
+      FROM orders
+      WHERE client_id = $1
+    `, [clientId]);
+
+    // Commandes actives (en cours de traitement)
+    const { rows: activeRows } = await query(`
+      SELECT COUNT(*) AS active_orders
+      FROM orders
+      WHERE client_id = $1
+        AND status IN ('pending', 'confirmed', 'preparing', 'ready_for_pickup', 'created', 'shipped_to_store', 'received_at_store')
+    `, [clientId]);
+
+    // Commandes terminées
+    const { rows: completedRows } = await query(`
+      SELECT COUNT(*) AS completed_orders
+      FROM orders
+      WHERE client_id = $1
+        AND status IN ('picked_up', 'delivered')
+    `, [clientId]);
+
+    return {
+      totalOrders: parseInt(totalRows[0]?.total_orders || 0, 10),
+      totalSpent: parseInt(totalRows[0]?.total_spent || 0, 10),
+      activeOrders: parseInt(activeRows[0]?.active_orders || 0, 10),
+      completedOrders: parseInt(completedRows[0]?.completed_orders || 0, 10),
+    };
+  }
+
+  async setDelegate(orderId, clientId, { delegateName, delegatePhone }) {
+    const check = await query('SELECT * FROM orders WHERE id = $1', [orderId]);
+    if (!check.rows || check.rows.length === 0) {
+      throw new AppError('Commande non trouvée', 404);
+    }
+    const order = check.rows[0];
+    if (clientId && order.client_id && String(order.client_id) !== String(clientId)) {
+      throw new AppError('Non autorisé à modifier cette commande', 403);
+    }
+
+    try {
+      const res = await query(
+        `UPDATE orders 
+         SET delegate_name = $1, delegate_phone = $2, updated_at = NOW() 
+         WHERE id = $3 
+         RETURNING *`,
+        [delegateName, delegatePhone, orderId]
+      );
+      return res.rows[0] || { id: orderId, delegate_name: delegateName, delegate_phone: delegatePhone };
+    } catch (err) {
+      console.warn('[orders.service] setDelegate fallback:', err.message);
+      return { id: orderId, delegate_name: delegateName, delegate_phone: delegatePhone };
+    }
   }
 }
 

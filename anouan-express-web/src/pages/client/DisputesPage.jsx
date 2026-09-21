@@ -1,13 +1,15 @@
 // src/pages/client/DisputesPage.jsx
 // Centre de réclamations & litiges client — Dark Premium Orange
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ShieldAlert, CheckCircle2, Clock, Plus, Search,
-  ArrowLeft, FileText, Upload, MessageSquare, ChevronRight, AlertCircle
+  ArrowLeft, FileText, Upload, MessageSquare, ChevronRight, AlertCircle, Camera, X
 } from 'lucide-react';
 import { useToast } from '../../components/ui/Toast';
+import { disputesAPI } from '../../services/api';
+import { compressImage } from '../../utils/imageCompressor';
 import PageHeader from '../../components/ui/PageHeader';
 
 const DEMO_DISPUTES = [
@@ -40,6 +42,7 @@ const DEMO_DISPUTES = [
 
 const STATUS_BADGE = {
   pending:  { label: 'En traitement', classes: 'bg-amber-500/10 border border-amber-500/30 text-amber-400', icon: Clock },
+  open:     { label: 'En traitement', classes: 'bg-amber-500/10 border border-amber-500/30 text-amber-400', icon: Clock },
   resolved: { label: 'Résolu',        classes: 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400', icon: CheckCircle2 },
   rejected: { label: 'Rejeté',        classes: 'bg-red-500/10 border border-red-500/30 text-red-400', icon: AlertCircle },
 };
@@ -58,20 +61,65 @@ export default function DisputesPage() {
   const [showModal, setShowModal] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
 
+  const [searchParams] = useSearchParams();
+
   // Form state
   const [formOrderId, setFormOrderId] = useState('');
   const [formType, setFormType] = useState('quality');
   const [formSubject, setFormSubject] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [proofPhotos, setProofPhotos] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    loadMyDisputes();
+    const prefillOrder = searchParams.get('orderId');
+    if (prefillOrder) {
+      setFormOrderId(prefillOrder);
+      setShowModal(true);
+    }
+  }, [searchParams]);
+
+  const loadMyDisputes = async () => {
+    try {
+      const res = await disputesAPI.getMyDisputes();
+      const data = res.data?.data || res.data;
+      if (Array.isArray(data) && data.length > 0) {
+        setDisputes(data);
+      }
+    } catch {}
+  };
+
   const filteredDisputes = disputes.filter((d) => {
-    if (activeTab === 'pending') return d.status === 'pending';
+    if (activeTab === 'pending') return d.status === 'pending' || d.status === 'open';
     if (activeTab === 'resolved') return d.status === 'resolved';
     return true;
   });
 
-  const handleSubmit = (e) => {
+  const handleProofUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    if (proofPhotos.length + files.length > 3) {
+      toast.error('Maximum 3 photos de preuve autorisées.');
+      return;
+    }
+    const newPhotos = [];
+    for (const f of files) {
+      try {
+        const compressed = await compressImage(f);
+        newPhotos.push({ file: compressed, previewUrl: URL.createObjectURL(compressed) });
+      } catch {
+        newPhotos.push({ file: f, previewUrl: URL.createObjectURL(f) });
+      }
+    }
+    setProofPhotos((prev) => [...prev, ...newPhotos]);
+  };
+
+  const removeProofPhoto = (index) => {
+    setProofPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formOrderId.trim() || !formSubject.trim() || !formDesc.trim()) {
       toast.error('Veuillez remplir tous les champs du formulaire.');
@@ -79,27 +127,44 @@ export default function DisputesPage() {
     }
 
     setSubmitting(true);
-    setTimeout(() => {
-      const newDispute = {
-        id: `DISP-${Math.floor(1000 + Math.random() * 9000)}`,
-        orderId: formOrderId.toUpperCase(),
-        vendorName: 'Vendeur Partenaire',
-        subject: formSubject,
-        type: formType,
-        status: 'pending',
-        createdAt: 'Aujourd\'hui',
-        description: formDesc,
-        adminNotes: 'Réclamation prise en charge. Un agent d\'Anouan Express vous recontactera sous 24h.',
-      };
+    try {
+      const formData = new FormData();
+      formData.append('orderId', formOrderId.trim());
+      formData.append('reason', `${formSubject.trim()} — ${formDesc.trim()}`);
+      formData.append('type', formType);
 
-      setDisputes([newDispute, ...disputes]);
-      setSubmitting(false);
+      for (const p of proofPhotos) {
+        formData.append('images', p.file);
+      }
+
+      const res = await disputesAPI.create(formData);
+      const created = res.data?.data || res.data;
+      toast.success('Réclamation soumise avec succès !');
+      setDisputes((prev) => [
+        {
+          id: created.id || `DISP-${Math.floor(1000 + Math.random() * 9000)}`,
+          orderId: formOrderId.toUpperCase(),
+          vendorName: 'Vendeur Partenaire',
+          subject: formSubject,
+          type: formType,
+          status: 'pending',
+          createdAt: 'Aujourd\'hui',
+          description: formDesc,
+          images: proofPhotos.map((p) => p.previewUrl),
+          adminNotes: 'Réclamation prise en charge par l\'équipe Anouan Express Bouaké.',
+        },
+        ...prev,
+      ]);
       setShowModal(false);
       setFormOrderId('');
       setFormSubject('');
       setFormDesc('');
-      toast.success('Réclamation soumise avec succès ! Numéro : ' + newDispute.id);
-    }, 600);
+      setProofPhotos([]);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Erreur lors de la déclaration du litige.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -198,6 +263,22 @@ export default function DisputesPage() {
                     <p className="text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
                       {dispute.description}
                     </p>
+                    {/* Photos de preuve */}
+                    {dispute.images && dispute.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {dispute.images.map((img, i) => (
+                          <a
+                            key={i}
+                            href={img}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="w-16 h-16 rounded-xl overflow-hidden border border-slate-800 hover:border-orange-500/50 transition-all hover:scale-105 block"
+                          >
+                            <img src={img} alt={`Preuve ${i + 1}`} className="w-full h-full object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Note de suivi admin */}
@@ -281,6 +362,31 @@ export default function DisputesPage() {
                     placeholder="Expliquez ce qui ne va pas avec précision..."
                     className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 text-white placeholder-slate-500 focus:border-orange-500 outline-none resize-none"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1.5">Photos de preuve <span className="text-slate-500 font-normal">(max 3)</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {proofPhotos.map((p, i) => (
+                      <div key={i} className="relative w-14 h-14 rounded-xl overflow-hidden border border-orange-500/40 group">
+                        <img src={p.previewUrl} alt="Preuve" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeProofPhoto(i)}
+                          className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X size={16} className="text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                    {proofPhotos.length < 3 && (
+                      <label className="w-14 h-14 rounded-xl border-2 border-dashed border-slate-800 hover:border-orange-500/50 flex flex-col items-center justify-center cursor-pointer text-slate-500 hover:text-orange-400 transition-colors">
+                        <Camera size={18} />
+                        <span className="text-[9px] mt-0.5">+Photo</span>
+                        <input type="file" accept="image/*" multiple onChange={handleProofUpload} className="hidden" />
+                      </label>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex gap-3 pt-2">

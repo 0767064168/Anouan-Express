@@ -14,5 +14,6 @@ router.put('/me/fcm-token', authenticate, validate({ body: fcmTokenSchema }), us
 router.get('/', authenticate, authorize('admin'), userController.getAllUsers);
 router.get('/:id', authenticate, authorize('admin'), userController.getUser);
 router.put('/:id/status', authenticate, authorize('admin'), validate({ body: updateStatusSchema }), auditMiddleware('user.status_change'), userController.updateStatus);
+router.delete('/:id', authenticate, authorize('admin'), auditMiddleware('user.deleted'), userController.deleteUser);
 
 module.exports = router;

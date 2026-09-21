@@ -3,7 +3,17 @@ const disputesService = require('./disputes.service');
 class DisputesController {
   async openDispute(req, res, next) {
     try {
-      const dispute = await disputesService.openDispute(req.user.id, req.body);
+      const disputeData = { ...req.body };
+      if (req.files && req.files.length) {
+        disputeData.images = req.files.map((f) => `/uploads/disputes/${f.filename}`);
+      } else if (typeof disputeData.images === 'string') {
+        try {
+          disputeData.images = JSON.parse(disputeData.images);
+        } catch {
+          disputeData.images = [disputeData.images];
+        }
+      }
+      const dispute = await disputesService.openDispute(req.user.id, disputeData);
       res.status(201).json({ success: true, data: dispute });
     } catch (err) {
       next(err);

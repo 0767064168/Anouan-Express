@@ -26,7 +26,8 @@ const authenticate = async (req, res, next) => {
 
     // Vérification que l'utilisateur existe encore et est actif
     const result = await query(
-      `SELECT u.id, u.name, u.email, u.phone, u.role, u.status, u.avatar_url, v.id as vendor_id
+            `SELECT u.id, u.name, u.email, u.phone, u.role, u.status, u.avatar_url, u.store_id,
+              v.id as vendor_id, v.validation_status AS vendor_validation_status
        FROM users u
        LEFT JOIN vendors v ON v.user_id = u.id
        WHERE u.id = $1`,
@@ -43,6 +44,9 @@ const authenticate = async (req, res, next) => {
     }
     if (user.status === 'inactive') {
       throw new AppError('Compte inactif.', 403, 'ACCOUNT_INACTIVE');
+    }
+    if (user.vendor_validation_status && user.vendor_validation_status !== 'approved') {
+      throw new AppError('Votre compte vendeur doit être activé par un administrateur.', 403, 'VENDOR_NOT_APPROVED');
     }
 
     user.vendorId = user.vendor_id || user.id;

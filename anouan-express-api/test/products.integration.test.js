@@ -17,6 +17,9 @@ jest.mock('../src/middlewares/upload', () => ({
   uploadAvatar: (req, res, next) => { req.file = { filename: 'avatar.jpg' }; return next(); },
   uploadBanner: (req, res, next) => { req.file = { filename: 'banner.jpg' }; return next(); },
   uploadLegalDoc: (req, res, next) => { req.file = { filename: 'doc.pdf' }; return next(); },
+  uploadReviewImages: (req, res, next) => { req.files = [{ filename: 'review.jpg' }]; return next(); },
+  uploadDisputeImages: (req, res, next) => { req.files = [{ filename: 'dispute.jpg' }]; return next(); },
+  uploadMessageAttachment: (req, res, next) => next(),
 }));
 
 // Mock DB to capture queries
@@ -34,7 +37,7 @@ jest.mock('../src/config/database', () => {
 });
 
 // require app after mocks so startup doesn't attempt real DB connections
-const app = require('../src/app');
+const { app } = require('../src/app');
 
 describe('POST /api/products', () => {
   it('creates a product when authenticated as vendor', async () => {

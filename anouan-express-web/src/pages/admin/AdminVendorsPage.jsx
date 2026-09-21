@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Search, CheckCircle, XCircle, AlertTriangle, Edit, FileText,
   Check, X, Store, Eye, ZoomIn, ZoomOut, Download, ShieldCheck,
-  Clock, MessageSquare, History, Bell, Send
+  Clock, MessageSquare, History, Bell, Send, RefreshCw
 } from 'lucide-react';
 import { vendorsAPI } from '../../services/api';
 import PageHeader from '../../components/ui/PageHeader';
@@ -52,12 +52,14 @@ const TABS = [
   { key: 'tous',       label: 'Tous'       },
   { key: 'actifs',     label: 'Actifs'     },
   { key: 'en_attente', label: 'En attente' },
+  { key: 'refuses',    label: 'Refusés'    },
   { key: 'suspendus',  label: 'Suspendus'  },
 ];
 
 const STATUS_CFG = {
   'Actif':      { cls: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25', icon: CheckCircle },
   'En attente': { cls: 'bg-amber-500/15  text-amber-400  border-amber-500/25',     icon: AlertTriangle },
+  'Refusé':     { cls: 'bg-rose-500/15   text-rose-400   border-rose-500/25',       icon: XCircle },
   'Suspendu':   { cls: 'bg-red-500/15    text-red-400    border-red-500/25',        icon: XCircle },
 };
 
@@ -106,30 +108,42 @@ const SmsToast = ({ msg, onClose }) => (
 /* ──────── Page Principale ──────── */
 export default function AdminVendorsPage() {
   const [vendors, setVendors] = useState([]);
+  const [vendorsLoading, setVendorsLoading] = useState(true);
+  const [vendorsError, setVendorsError] = useState('');
 
   const loadVendors = async () => {
+    setVendorsLoading(true);
+    setVendorsError('');
     try {
       const res = await vendorsAPI.getAll({ limit: 100 });
-      const vData = res.data?.data || res.data || [];
+      const payload = res.data?.data || res.data || {};
+      const vData = Array.isArray(payload) ? payload : (payload.data || payload.vendors || []);
       if (Array.isArray(vData)) {
         setVendors(vData.map(v => ({
           id: v.id,
-          name: v.shop_name,
+          name: v.shop_name || v.name || 'Boutique sans nom',
           owner: v.owner_name || 'Commerçant',
           email: v.owner_email || 'vendeur@anouan.ci',
-          phone: v.owner_phone || '+225 07 00 00 00',
-          city: 'Bouaké',
-          status: v.validation_status === 'approved' ? 'Actif' : (v.validation_status === 'suspended' ? 'Suspendu' : 'En attente'),
+          phone: v.owner_phone || v.phone || '+225 07 00 00 00',
+          city: v.city || '',
+          status: v.validation_status === 'approved'
+            ? 'Actif'
+            : (v.validation_status === 'suspended'
+              ? 'Suspendu'
+              : (v.validation_status === 'rejected' ? 'Refusé' : 'En attente')),
           commission: Number(v.commission_rate || 10),
           appliedAt: new Date(v.created_at).toLocaleDateString('fr-CI'),
-          products: 0,
+          products: Number(v.product_count || 0),
           docs: makeDocs(),
         })));
-        return;
+      } else {
+        setVendors([]);
       }
     } catch (e) {
       console.error('Erreur chargement vendeurs:', e);
-      setVendors([]);
+      setVendorsError(e.response?.data?.message || 'Impossible de charger les vendeurs.');
+    } finally {
+      setVendorsLoading(false);
     }
   };
 
@@ -216,8 +230,11 @@ export default function AdminVendorsPage() {
   };
 
   /* Changer le statut du vendeur */
-  const updateStatus = async (id, newStatus) => {
-    const action = newStatus === 'Actif' ? 'approve' : (newStatus === 'Suspendu' ? 'suspend' : 'reject');
+  const updateStatus = async (id, newStatus, actionOverride) => {
+    const action = actionOverride || (newStatus === 'Actif' ? 'approve' : (newStatus === 'Suspendu' ? 'suspend' : 'reject'));
+    const vendorToUpdate = vendors.find((item) => item.id === id);
+    const actionLabel = newStatus === 'Actif' ? 'activer' : (newStatus === 'Refusé' ? 'refuser' : 'suspendre');
+    if (!vendorToUpdate || !window.confirm(`Confirmer l’action « ${actionLabel} » pour la boutique ${vendorToUpdate.name} ?`)) return;
     try {
       await vendorsAPI.updateStatus(id, { action });
       await loadVendors();
@@ -257,6 +274,7 @@ export default function AdminVendorsPage() {
       activeTab === 'tous' ||
       (activeTab === 'actifs'     && v.status === 'Actif')      ||
       (activeTab === 'en_attente' && v.status === 'En attente') ||
+      (activeTab === 'refuses'    && v.status === 'Refusé')     ||
       (activeTab === 'suspendus'  && v.status === 'Suspendu');
     const matchSearch =
       v.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -277,19 +295,31 @@ export default function AdminVendorsPage() {
         eyebrowIcon={Store}
         title="Gestion des Vendeurs"
         subtitle="Supervisez, validez et gérez les comptes vendeurs de la plateforme."
-        actions={newVendorCount > 0 && (
-          <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 text-amber-400 px-4 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
-            <Bell size={14} />
-            {newVendorCount} nouvelle{newVendorCount > 1 ? 's' : ''} demande{newVendorCount > 1 ? 's' : ''}
+        actions={(
+          <div className="flex items-center gap-2">
+            {newVendorCount > 0 && (
+              <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 text-amber-400 px-4 py-2.5 rounded-2xl text-xs font-bold animate-pulse">
+                <Bell size={14} />
+                {newVendorCount} nouvelle{newVendorCount > 1 ? 's' : ''} demande{newVendorCount > 1 ? 's' : ''}
+              </div>
+            )}
+            <button
+              onClick={loadVendors}
+              disabled={vendorsLoading}
+              className="flex items-center gap-2 rounded-2xl border border-slate-800 bg-slate-900 px-4 py-2.5 text-xs font-bold text-slate-300 transition-all hover:border-orange-500/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <RefreshCw size={14} className={vendorsLoading ? 'animate-spin' : ''} /> Rafraîchir
+            </button>
           </div>
         )}
       />
 
       {/* Stats rapides */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Vendeurs actifs',       value: vendors.filter((v) => v.status === 'Actif').length,      color: 'text-emerald-400' },
           { label: 'En attente validation', value: vendors.filter((v) => v.status === 'En attente').length, color: 'text-amber-400' },
+          { label: 'Demandes refusées',     value: vendors.filter((v) => v.status === 'Refusé').length,    color: 'text-rose-400' },
           { label: 'Suspendus',             value: vendors.filter((v) => v.status === 'Suspendu').length,   color: 'text-red-400' },
         ].map((s) => (
           <div key={s.label} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-4 text-center">
@@ -338,6 +368,15 @@ export default function AdminVendorsPage() {
 
       {/* Table */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-3xl overflow-hidden">
+        {vendorsError && (
+          <div className="m-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-300">
+            {vendorsError}
+            <button onClick={loadVendors} className="ml-3 text-red-200 underline">Réessayer</button>
+          </div>
+        )}
+        {vendorsLoading && (
+          <div className="px-5 py-10 text-center text-xs text-slate-400">Chargement des vendeurs...</div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-900/80 text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-800">
@@ -351,7 +390,7 @@ export default function AdminVendorsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {filteredVendors.map((vendor) => (
+              {!vendorsLoading && filteredVendors.map((vendor) => (
                 <tr key={vendor.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
@@ -387,6 +426,9 @@ export default function AdminVendorsPage() {
               ))}
             </tbody>
           </table>
+          {!vendorsLoading && filteredVendors.length === 0 && !vendorsError && (
+            <div className="px-5 py-12 text-center text-sm font-semibold text-slate-500">Aucun vendeur trouvé.</div>
+          )}
         </div>
       </div>
 
@@ -577,7 +619,7 @@ export default function AdminVendorsPage() {
               {selectedVendor.status === 'En attente' && (
                 <>
                   <button
-                    onClick={() => updateStatus(selectedVendor.id, 'Suspendu')}
+                    onClick={() => updateStatus(selectedVendor.id, 'Refusé', 'reject')}
                     className="px-4 py-2 bg-red-500/10 border border-red-500/25 text-red-400 text-xs font-bold rounded-2xl hover:bg-red-500/20 transition-colors flex items-center gap-1.5"
                   >
                     <X size={13} /> Rejeter
@@ -590,6 +632,14 @@ export default function AdminVendorsPage() {
                   </button>
                 </>
               )}
+              {selectedVendor.status === 'Refusé' && (
+                <button
+                  onClick={() => updateStatus(selectedVendor.id, 'Actif', 'reactivate')}
+                  className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold rounded-2xl hover:bg-emerald-500/20 transition-colors flex items-center gap-1.5"
+                >
+                  <Check size={13} /> Réactiver
+                </button>
+              )}
               {selectedVendor.status === 'Actif' && (
                 <button
                   onClick={() => updateStatus(selectedVendor.id, 'Suspendu')}
@@ -600,7 +650,7 @@ export default function AdminVendorsPage() {
               )}
               {selectedVendor.status === 'Suspendu' && (
                 <button
-                  onClick={() => updateStatus(selectedVendor.id, 'Actif')}
+                  onClick={() => updateStatus(selectedVendor.id, 'Actif', 'reactivate')}
                   className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-bold rounded-2xl hover:bg-emerald-500/20 transition-colors flex items-center gap-1.5"
                 >
                   <Check size={13} /> Réactiver

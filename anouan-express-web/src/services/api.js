@@ -3,7 +3,29 @@
 
 import axios from 'axios';
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+// Détection intelligente de l'environnement Capacitor / Mobile
+const isCapacitor = () => {
+  if (typeof window === 'undefined') return false;
+  return Boolean(window.Capacitor?.isNativePlatform?.() || window.location.origin === 'http://localhost' || window.location.origin === 'capacitor://localhost');
+};
+
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl && envUrl.startsWith('http')) return envUrl;
+  if (isCapacitor()) {
+    // Sur smartphone Android réel, joindre directement le PC hôte
+    return 'http://192.168.11.40:5000/api';
+  }
+  return envUrl || '/api';
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
+
+export const getAssetUrl = (url) => {
+  if (!url || url.startsWith('http') || url.startsWith('blob:')) return url;
+  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '');
+  return `${apiOrigin}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -21,6 +43,10 @@ api.interceptors.request.use((config) => {
   const csrfToken = getCookie('csrfToken');
   if (csrfToken && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
     config.headers['X-CSRF-Token'] = csrfToken;
+  }
+  const token = localStorage.getItem('accessToken');
+  if (token && !config.headers['Authorization']) {
+    config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
 });
@@ -42,7 +68,8 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const hasSessionHint = Boolean(localStorage.getItem('accessToken') || getCookie('csrfToken'));
+    if (error.response?.status === 401 && hasSessionHint && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -59,9 +86,13 @@ api.interceptors.response.use(
           withCredentials: true,
           headers: { 'X-CSRF-Token': getCookie('csrfToken') || '' },
         });
+        // The refreshed access token is HttpOnly; stop sending the expired
+        // local token so the retried request uses the refreshed cookie.
+        localStorage.removeItem('accessToken');
         processQueue(null);
         return api(originalRequest);
       } catch (refreshError) {
+        localStorage.removeItem('accessToken');
         processQueue(refreshError);
         return Promise.reject(refreshError);
       } finally {
@@ -90,6 +121,7 @@ export const usersAPI = {
   getMe: () => api.get('/users/me'),
   getAll: (params) => api.get('/users', { params }),
   updateStatus: (id, status) => api.put(`/users/${id}/status`, { status }),
+  delete: (id) => api.delete(`/users/${id}`),
   updateMe: (data) => api.put('/users/me', data),
   updateAvatar: (formData) =>
     api.post('/users/me/avatar', formData, {
@@ -103,6 +135,7 @@ export const categoriesAPI = {
 
 export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
+  getVendorProducts: (params) => api.get('/products/vendor/me', { params }),
   getById: (id) => api.get(`/products/${id}`),
   search: (q, params) => api.get('/products/search', { params: { q, ...params } }),
   create: (formData) =>
@@ -113,8 +146,12 @@ export const productsAPI = {
 };
 
 export const storesAPI = {
-  getAll: () => api.get('/stores'),
+  getAll: (params) => api.get('/stores', { params }),
   getById: (id) => api.get(`/stores/${id}`),
+  create: (data) => api.post('/stores', data),
+  update: (id, data) => api.put(`/stores/${id}`, data),
+  toggleActive: (id) => api.patch(`/stores/${id}/toggle`),
+  delete: (id) => api.delete(`/stores/${id}`),
 };
 
 export const ordersAPI = {
@@ -129,11 +166,14 @@ export const ordersAPI = {
     api.put(`/orders/${orderId}/items/${itemId}/status`, typeof data === 'object' ? data : { status: data }),
   getInvoice: (id) =>
     api.get(`/orders/${id}/invoice`, { responseType: 'blob' }),
+  getMyStats: () => api.get('/orders/my/stats'),
+  setDelegate: (orderId, data) => api.patch(`/orders/${orderId}/delegate`, data),
 };
 
 export const paymentsAPI = {
   initiate: (data) => api.post('/payments/initiate', data),
   getStatus: (transactionId) => api.get(`/payments/status/${transactionId}`),
+  poll: (orderId) => api.get(`/payments/poll/${orderId}`),
 };
 
 export const pickupAPI = {
@@ -148,6 +188,8 @@ export const pickupAPI = {
 export const reviewsAPI = {
   getProductReviews: (productId, params) =>
     api.get(`/reviews/product/${productId}`, { params }),
+  getVendorReviews: (vendorId, params) =>
+    api.get(`/reviews/vendor/${vendorId}`, { params }),
   submit: (data) => api.post('/reviews', data),
 };
 
@@ -192,18 +234,24 @@ export const adminAPI = {
   getFlashSales: () => api.get('/admin/flash-sales'),
   getPublicFlashSales: () => api.get('/admin/public/flash-sales'),
   createFlashSale: (data) => api.post('/admin/flash-sales', data),
+  createFlashSales: (data) => api.post('/admin/flash-sales/bulk', data),
+  toggleFlashSale: (id) => api.patch(`/admin/flash-sales/${id}/toggle`),
   updateFlashSale: (id, data) => api.put(`/admin/flash-sales/${id}`, data),
   deleteFlashSale: (id) => api.delete(`/admin/flash-sales/${id}`),
   getAuditLogs: (params) => api.get('/admin/audit-logs', { params }),
   getSettings: () => api.get('/admin/settings'),
   updateSetting: (key, data) => api.put(`/admin/settings/${key}`, data),
+  createAdmin: (data) => api.post('/admin/admins', data),
+  createAgent: (data) => api.post('/admin/agents', data),
+  assignAgentStore: (userId, storeId) => api.put(`/admin/agents/${userId}/store`, { storeId }),
+  updateAgent: (userId, data) => api.put(`/admin/agents/${userId}`, data),
 };
 
 export const messagesAPI = {
   getConversations: () => api.get('/messages'),
   getMessages: (conversationId, params) =>
     api.get(`/messages/${conversationId}`, { params }),
-  send: (data) => api.post('/messages', data),
+  send: (data) => api.post('/messages', data, data instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
   markRead: (partnerId) => api.put(`/messages/${partnerId}/read`),
 };
 

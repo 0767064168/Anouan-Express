@@ -6,7 +6,7 @@ import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ShoppingCart, Image, Megaphone,
   DollarSign, Settings, LogOut, Store, Menu, Bell, X, Search,
-  ShieldCheck, ChevronRight, Sparkles, Package
+  ShieldCheck, ChevronRight, Sparkles, Package, MapPin
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Logo from '../ui/Logo';
@@ -17,7 +17,8 @@ const navItems = [
   { name: 'Utilisateurs', path: '/admin/users',         icon: Users,           desc: 'Comptes clients & vendeurs' },
   { name: 'Vendeurs',     path: '/admin/vendors',       icon: Store,           desc: 'Gérer les boutiques' },
   { name: 'Commandes',    path: '/admin/orders',        icon: ShoppingCart,    desc: 'Suivi des commandes' },
-  { name: 'Guichet Relais', path: '/admin/agent',          icon: Package,         desc: 'Retraits & Caisse' },
+  { name: 'Points Relais', path: '/admin/stores',       icon: MapPin,          desc: 'Magasins & Hubs' },
+  { name: 'Guichet Relais', path: '/admin/agent',       icon: Package,         desc: 'Retraits & Caisse' },
   { name: 'Marketing',    path: '/admin/marketing',     icon: Megaphone,       desc: 'Bannières & Promos' },
   { name: 'Finance',      path: '/admin/finance',       icon: DollarSign,      desc: 'Paiements & Bilans' },
   { name: 'Paramètres',   path: '/admin/settings',      icon: Settings,        desc: 'Configuration plateforme' },

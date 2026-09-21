@@ -2,6 +2,7 @@
 // Point d'entrée principal de l'API Anouan Express
 
 const express = require('express');
+const http = require('http');
 const helmet = require('helmet');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -10,6 +11,7 @@ const path = require('path');
 
 const env = require('./config/env');
 const { testConnection } = require('./config/database');
+const { initSocket } = require('./config/socket');
 const { globalLimiter } = require('./middlewares/rateLimiter');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 const { sanitizeInputs } = require('./middlewares/sanitize');
@@ -128,11 +130,14 @@ app.use(notFound);
 app.use(errorHandler);
 
 // ─── Démarrage ────────────────────────────────────────────────
+const server = http.createServer(app);
+const io = initSocket(server);
+
 const start = async () => {
   try {
     await testConnection();
-    app.listen(env.app.port, '0.0.0.0', () => {
-      console.log(`\n🚀 ${env.app.name} démarré`);
+    server.listen(env.app.port, '0.0.0.0', () => {
+      console.log(`\n🚀 ${env.app.name} démarré avec WebSockets`);
       console.log(`   Environnement : ${env.app.env}`);
       console.log(`   Port          : ${env.app.port}`);
       console.log(`   URL           : ${env.app.url}`);
@@ -144,8 +149,8 @@ const start = async () => {
   }
 };
 
-if (env.app.env !== 'test') {
+if (env.app.env !== 'test' && !process.env.JEST_WORKER_ID) {
   start();
 }
 
-module.exports = app; // Pour les tests
+module.exports = { app, server, io }; // Pour les tests

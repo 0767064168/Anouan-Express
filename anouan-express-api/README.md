@@ -48,9 +48,11 @@ copy .env.example .env
 # Créer la base de données
 psql -U postgres -c "CREATE DATABASE anouan_express;"
 
-# Exécuter les migrations + seeds
-psql -U postgres -d anouan_express -f migrations/001_schema.sql
-psql -U postgres -d anouan_express -f migrations/002_seeds.sql
+# Exécuter toutes les migrations + seeds
+npm run migrate:unix
+
+# Ou sous Windows PowerShell avec les variables DB_* configurées
+npm run migrate
 ```
 
 ### 5. Lancer le serveur

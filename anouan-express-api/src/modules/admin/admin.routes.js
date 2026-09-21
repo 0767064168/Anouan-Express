@@ -7,7 +7,7 @@ const { validate } = require('../../middlewares/validate');
 const { uploadBanner } = require('../../middlewares/upload');
 const { 
   createBannerSchema, updateBannerSchema, 
-  createFlashSaleSchema, updateSettingSchema, assignRoleSchema 
+  createFlashSaleSchema, createFlashSalesSchema, updateFlashSaleSchema, updateSettingSchema, assignRoleSchema, createAdminSchema, createAgentSchema, assignAgentStoreSchema, updateAgentSchema
 } = require('./admin.validation');
 
 // Public endpoints for home page and mobile app
@@ -29,6 +29,9 @@ router.get('/stats', adminController.getStats);
 // Flash Sales
 router.get('/flash-sales', adminController.getFlashSales);
 router.post('/flash-sales', validate({ body: createFlashSaleSchema }), adminController.createFlashSale);
+router.post('/flash-sales/bulk', validate({ body: createFlashSalesSchema }), adminController.createFlashSales);
+router.put('/flash-sales/:id', validate({ body: updateFlashSaleSchema }), adminController.updateFlashSale);
+router.patch('/flash-sales/:id/toggle', adminController.toggleFlashSaleActive);
 router.delete('/flash-sales/:id', adminController.deleteFlashSale);
 
 // Settings
@@ -37,6 +40,10 @@ router.put('/settings/:key', validate({ body: updateSettingSchema }), adminContr
 
 // Roles
 router.get('/roles', adminController.getUserRoles);
+router.post('/admins', validate({ body: createAdminSchema }), adminController.createAdmin);
+router.post('/agents', validate({ body: createAgentSchema }), adminController.createAgent);
+router.put('/agents/:userId', validate({ body: updateAgentSchema }), adminController.updateAgent);
+router.put('/agents/:userId/store', validate({ body: assignAgentStoreSchema }), adminController.assignAgentStore);
 router.put('/roles/:userId', validate({ body: assignRoleSchema }), adminController.assignRole);
 
 // Audit Logs

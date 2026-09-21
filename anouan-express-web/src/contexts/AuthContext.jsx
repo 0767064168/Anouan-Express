@@ -1,8 +1,7 @@
-// src/contexts/AuthContext.jsx
-// Contexte d'authentification global — gestion JWT, rôles, user et secours fluide
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI, usersAPI } from '../services/api';
+import { connectSocket, disconnectSocket } from '../services/socket';
+import { requestNotificationPermission, saveFcmToken } from '../services/fcm';
 
 const AuthContext = createContext(null);
 
@@ -17,13 +16,34 @@ export function AuthProvider({ children }) {
         const { data } = await usersAPI.getMe();
         const u = data.data || data;
         setUser(u);
-      } catch {
-        _clearSession();
+        if (u?.id) {
+          connectSocket(null, u.id);
+        }
+      } catch (error) {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
+          _clearSession();
+        } else {
+          console.warn('Session restore failed:', error?.message || 'unknown auth error');
+          _clearSession();
+        }
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     initAuth();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      connectSocket(null, user.id);
+      requestNotificationPermission().then(token => {
+        if (token) saveFcmToken(token);
+      }).catch(() => {});
+    } else {
+      disconnectSocket();
+    }
+  }, [user]);
 
   // ─── Connexion email/mot de passe ─────────────────────────
   const login = useCallback(async ({ email, password }) => {
@@ -73,14 +93,16 @@ export function AuthProvider({ children }) {
 
   // ─── Helpers privés ──────────────────────────────────────
   const _persistSession = (payload) => {
-    const { user: u } = payload || {};
+    const { user: u, accessToken } = payload || {};
+    if (accessToken) localStorage.setItem('accessToken', accessToken);
     if (u) localStorage.setItem('user', JSON.stringify(u));
     if (u) setUser(u);
-    return { user: u };
+    return { user: u, accessToken };
   };
 
   const _clearSession = () => {
     localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
     setUser(null);
   };
 

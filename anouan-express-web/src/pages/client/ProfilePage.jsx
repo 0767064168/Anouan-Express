@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Package, Heart, Settings, MapPin, LogOut, ChevronRight, QrCode, Loader2, CheckCircle2 } from 'lucide-react';
+import { User, Package, Heart, Settings, MapPin, LogOut, ChevronRight, QrCode, Loader2, CheckCircle2, Star, Gift } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { ordersAPI, usersAPI } from '../../services/api';
 import { QRCodeSVG } from 'qrcode.react';
@@ -18,6 +18,7 @@ export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState('orders');
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [loyaltyPoints, setLoyaltyPoints] = useState(user?.loyalty_points || 0);
 
   // Formulaire d'édition profil
   const [profileForm, setProfileForm] = useState({
@@ -38,6 +39,11 @@ export default function ProfilePage() {
 
   useEffect(() => {
     loadMyOrders();
+    // Charger le solde de points fidélité
+    usersAPI.getMe().then((res) => {
+      const pts = res.data?.data?.loyalty_points ?? res.data?.loyalty_points;
+      if (typeof pts === 'number') setLoyaltyPoints(pts);
+    }).catch(() => {});
 
     const handleSync = () => loadMyOrders();
     window.addEventListener('anouan_order_status_updated', handleSync);
@@ -139,6 +145,17 @@ export default function ProfilePage() {
                   <div className="flex items-center gap-3"><QrCode className="w-4 h-4" /> Codes de Retrait</div>
                   {activeCodes.length > 0 && (
                     <span className="bg-slate-950 text-white text-[10px] font-black px-2 py-0.5 rounded-full border border-slate-700">{activeCodes.length}</span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setActiveTab('loyalty')}
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl text-xs font-bold transition-colors ${
+                    activeTab === 'loyalty' ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:bg-slate-800/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-3"><Star className="w-4 h-4" /> Anouan Club</div>
+                  {loyaltyPoints > 0 && (
+                    <span className="bg-amber-500/20 text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-500/30">{loyaltyPoints} pts</span>
                   )}
                 </button>
                 <button
@@ -246,6 +263,80 @@ export default function ProfilePage() {
                 )}
               </div>
             )}
+
+            {/* Onglet Anouan Club */}
+            {activeTab === 'loyalty' && (() => {
+              const tier = loyaltyPoints >= 5000 ? { name: 'Or', color: 'from-yellow-400 to-amber-500', border: 'border-yellow-500/40', icon: '🥇', min: 5000 }
+                : loyaltyPoints >= 1000 ? { name: 'Argent', color: 'from-slate-300 to-slate-400', border: 'border-slate-400/40', icon: '🥈', min: 1000 }
+                : { name: 'Bronze', color: 'from-amber-700 to-amber-600', border: 'border-amber-700/40', icon: '🥉', min: 0 };
+              const nextTier = loyaltyPoints < 1000 ? { name: 'Argent', needed: 1000 - loyaltyPoints }
+                : loyaltyPoints < 5000 ? { name: 'Or', needed: 5000 - loyaltyPoints }
+                : null;
+              const fcfaEquiv = Math.floor(loyaltyPoints / 2); // 2 pts = 1 FCFA de réduction
+              const progress = nextTier
+                ? Math.round((loyaltyPoints / (loyaltyPoints + nextTier.needed)) * 100)
+                : 100;
+
+              return (
+                <div className="space-y-5">
+                  {/* Carte de fidélité */}
+                  <div className={`relative bg-gradient-to-br ${tier.color} rounded-3xl p-6 overflow-hidden shadow-2xl`}>
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-10 translate-x-10" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-black/10 rounded-full translate-y-8 -translate-x-8" />
+                    <div className="relative z-10">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="text-slate-950/70 text-[10px] font-bold uppercase tracking-widest">Anouan Club</p>
+                          <h3 className="text-slate-950 text-2xl font-black">{tier.icon} Membre {tier.name}</h3>
+                        </div>
+                        <Star className="w-8 h-8 text-slate-950/30" />
+                      </div>
+                      <p className="text-slate-950 text-4xl font-black mb-1">{loyaltyPoints.toLocaleString('fr-CI')}</p>
+                      <p className="text-slate-950/70 text-xs font-bold">points accumulés</p>
+                      <div className="mt-4 pt-4 border-t border-slate-950/20">
+                        <p className="text-slate-950 text-sm font-black">≈ {fcfaEquiv.toLocaleString('fr-CI')} FCFA</p>
+                        <p className="text-slate-950/60 text-[10px]">de réduction disponible (2 pts = 1 FCFA)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Progression vers le palier suivant */}
+                  {nextTier && (
+                    <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-3">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-300 font-bold">Progression vers {nextTier.name}</span>
+                        <span className="text-amber-400 font-black">{nextTier.needed} pts restants</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full bg-gradient-to-r ${tier.color} rounded-full transition-all duration-700`}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Chaque commande retirée vous rapporte des points (1 pt pour 100 FCFA dépensé)
+                      </p>
+                    </div>
+                  )}
+                  {!nextTier && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-3xl p-4 text-center">
+                      <p className="text-yellow-400 font-black text-sm">🏆 Vous êtes au niveau maximum — Membre Or !</p>
+                    </div>
+                  )}
+
+                  {/* Avantages du palier */}
+                  <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-3">
+                    <h4 className="text-white font-black text-sm flex items-center gap-2"><Gift size={16} className="text-amber-400" /> Vos avantages</h4>
+                    <ul className="space-y-2 text-xs text-slate-300">
+                      <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> 1 point pour chaque tranche de 100 FCFA dépensée</li>
+                      <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> 2 points = 1 FCFA de réduction sur votre prochaine commande</li>
+                      {loyaltyPoints >= 1000 && <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Membre Argent : Priorité de service au magasin</li>}
+                      {loyaltyPoints >= 5000 && <li className="flex items-center gap-2"><span className="text-emerald-400">✓</span> Membre Or : Accès aux ventes privées & offres exclusives</li>}
+                    </ul>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Onglet Paramètres */}
             {activeTab === 'settings' && (

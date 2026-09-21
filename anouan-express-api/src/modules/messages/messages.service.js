@@ -65,14 +65,39 @@ class MessagesService {
     };
   }
 
-  async sendMessage(senderId, { recipientId, content, productId, orderId }) {
+  async sendMessage(senderId, { recipientId, content = '', productId, orderId, attachmentUrl, attachmentType, attachmentName }) {
     const res = await query(
-      `INSERT INTO messages (sender_id, recipient_id, content, product_id, order_id, is_read)
-       VALUES ($1, $2, $3, $4, $5, false)
+      `INSERT INTO messages (sender_id, recipient_id, content, product_id, order_id, attachment_url, attachment_type, attachment_name, is_read)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false)
        RETURNING *`,
-      [senderId, recipientId, content, productId || null, orderId || null]
+      [senderId, recipientId, content, productId || null, orderId || null, attachmentUrl || null, attachmentType || null, attachmentName || null]
     );
-    return res.rows[0];
+    const newMsg = res.rows[0];
+
+    // Notification Socket.io en direct au destinataire
+    try {
+      const { emitToUser } = require('../../config/socket');
+      emitToUser(recipientId, 'new_message', newMsg);
+    } catch (err) {
+      // Si Socket.io non dispo, continue
+    }
+
+    // Push FCM au destinataire
+    try {
+      const { sendPushNotification } = require('../../config/firebase');
+      const recipientRes = await query('SELECT fcm_token, name FROM users WHERE id = $1', [recipientId]);
+      const senderRes = await query('SELECT name FROM users WHERE id = $1', [senderId]);
+      const fcmToken = recipientRes.rows[0]?.fcm_token;
+      const senderName = senderRes.rows[0]?.name || 'Quelqu\'un';
+      await sendPushNotification(
+        fcmToken,
+        `💬 Nouveau message de ${senderName}`,
+        content.length > 80 ? content.substring(0, 80) + '…' : content,
+        { senderId: String(senderId), type: 'new_message' }
+      );
+    } catch (err) {}
+
+    return newMsg;
   }
 
   async markAllRead(userId, partnerId) {

@@ -97,6 +97,30 @@ const uploadLegalDoc = multer({
 }).single('legal_doc');
 
 /**
+ * Upload d'images d'avis clients (max 3 images)
+ */
+const uploadReviewImages = multer({
+  storage: createStorage('reviews'),
+  fileFilter: imageFilter,
+  limits: { fileSize: maxSizeBytes, files: 3 },
+}).array('images', 3);
+
+/**
+ * Upload d'images de réclamations / litiges (max 3 images)
+ */
+const uploadDisputeImages = multer({
+  storage: createStorage('disputes'),
+  fileFilter: imageFilter,
+  limits: { fileSize: maxSizeBytes, files: 3 },
+}).array('images', 3);
+
+const uploadMessageAttachment = multer({
+  storage: createStorage('messages'),
+  fileFilter: imageFilter,
+  limits: { fileSize: maxSizeBytes, files: 1 },
+}).single('attachment');
+
+/**
  * Wrapper pour transformer les erreurs Multer en AppError
  */
 const handleMulterError = (uploader) => (req, res, next) => {
@@ -117,4 +141,7 @@ module.exports = {
   uploadAvatar: handleMulterError(uploadAvatar),
   uploadBanner: handleMulterError(uploadBanner),
   uploadLegalDoc: handleMulterError(uploadLegalDoc),
+  uploadReviewImages: handleMulterError(uploadReviewImages),
+  uploadDisputeImages: handleMulterError(uploadDisputeImages),
+  uploadMessageAttachment: handleMulterError(uploadMessageAttachment),
 };

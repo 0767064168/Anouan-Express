@@ -53,6 +53,15 @@ const updateStatus = async (req, res, next) => {
   }
 };
 
+const deleteUser = async (req, res, next) => {
+  try {
+    const user = await userService.deleteUser(req.params.id, req.user.id);
+    res.json({ success: true, data: user, message: 'Compte supprimé avec succès.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const updateFcmToken = async (req, res, next) => {
   try {
     await userService.updateFcmToken(req.user.id, req.body.fcmToken);
@@ -68,5 +77,6 @@ module.exports = {
   getAllUsers,
   getUser,
   updateStatus,
+  deleteUser,
   updateFcmToken
 };

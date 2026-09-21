@@ -3,46 +3,48 @@ const { AppError } = require('../../middlewares/errorHandler');
 const notificationsService = require('../notifications/notifications.service'); // Assuming structure
 
 class DisputesService {
-  async openDispute(clientId, { orderId, reason }) {
+  async openDispute(clientId, { orderId, reason, type = 'quality', images = [] }) {
     return withTransaction(async (client) => {
       const orderRes = await client.query(
-        `SELECT id, status FROM orders WHERE id = $1 AND client_id = $2`,
-        [orderId, clientId]
+        `SELECT id, status FROM orders WHERE (id::text = $1::text OR tracking_number = $1) AND client_id = $2`,
+        [String(orderId), clientId]
       );
-      
+
       if (orderRes.rows.length === 0) {
-        throw new AppError('Order not found or unauthorized', 404);
+        throw new AppError('Commande introuvable ou non autorisée', 404);
       }
-      
+
       const order = orderRes.rows[0];
       if (order.status === 'cancelled') {
-        throw new AppError('Cannot open dispute on cancelled order', 400);
+        throw new AppError('Impossible d\'ouvrir un litige sur une commande déjà annulée', 400);
       }
 
       const existRes = await client.query(
-        `SELECT id FROM disputes WHERE order_id = $1 AND status != 'closed'`,
-        [orderId]
+        `SELECT id FROM disputes WHERE order_id = $1 AND status NOT IN ('closed', 'resolved')`,
+        [order.id]
       );
-      
+
       if (existRes.rows.length > 0) {
-        throw new AppError('An open dispute already exists for this order', 400);
+        throw new AppError('Un litige en cours existe déjà pour cette commande', 400);
       }
 
       const disputeRes = await client.query(
-        `INSERT INTO disputes (client_id, order_id, reason, status)
-         VALUES ($1, $2, $3, 'open')
+        `INSERT INTO disputes (client_id, order_id, reason, type, images, status)
+         VALUES ($1, $2, $3, $4, $5, 'pending')
          RETURNING *`,
-        [clientId, orderId, reason]
+        [clientId, order.id, reason, type || 'quality', images || []]
       );
 
       await client.query(
-        `UPDATE orders SET status = 'disputed' WHERE id = $1`,
-        [orderId]
+        `UPDATE orders SET status = 'disputed', updated_at = NOW() WHERE id = $1`,
+        [order.id]
       );
 
-      // In a real app we'd get admin IDs to notify
-      // notificationsService.createNotification(...)
-      
+      try {
+        const { emitToUser } = require('../../config/socket');
+        emitToUser(clientId, 'dispute_opened', disputeRes.rows[0]);
+      } catch {}
+
       return disputeRes.rows[0];
     });
   }

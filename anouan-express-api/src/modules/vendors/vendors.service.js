@@ -84,7 +84,9 @@ const getAllVendors = async (page = 1, limit = 20, filters = {}) => {
 
   const dataValues = [...values, limit, offset];
   const dataQuery = `
-    SELECT v.id, v.user_id, v.shop_name, v.validation_status, v.commission_rate, v.created_at, u.name as owner_name, u.email as owner_email 
+            SELECT v.id, v.user_id, v.shop_name, v.validation_status, v.commission_rate, v.created_at,
+              u.name as owner_name, u.email as owner_email, u.phone as owner_phone,
+              (SELECT COUNT(*) FROM products p WHERE p.vendor_id = v.id AND p.status != 'deleted')::int AS product_count
     FROM vendors v 
     JOIN users u ON v.user_id = u.id 
     ${whereString} 
@@ -153,23 +155,33 @@ const setCommissionRate = async (vendorId, rate) => {
 };
 
 const getVendorStats = async (vendorId) => {
-  const orderResult = await query(
-    `SELECT COUNT(id) as total_orders, COALESCE(SUM(total_amount), 0) as total_revenue, COALESCE(SUM(platform_fee), 0) as commission_due 
-     FROM orders 
-     WHERE vendor_id = $1 AND status = 'delivered'`,
-    [vendorId]
-  );
-  
-  const ratingResult = await query(
-    `SELECT COALESCE(AVG(rating), 0) as avg_rating FROM reviews WHERE vendor_id = $1`,
+  const result = await query(
+    `SELECT
+       COUNT(o.id) FILTER (WHERE o.status = 'delivered')::int AS total_orders,
+       COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered'), 0) AS total_revenue,
+       COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'delivered' AND o.created_at >= date_trunc('month', NOW())), 0) AS month_revenue,
+       COUNT(o.id) FILTER (WHERE o.status IN ('created', 'preparing', 'shipped_to_store', 'ready_for_pickup'))::int AS pending_orders,
+       COALESCE(SUM(o.platform_fee) FILTER (WHERE o.status = 'delivered'), 0) AS commission_due,
+       (SELECT COUNT(*) FROM products p WHERE p.vendor_id = $1 AND p.status != 'deleted')::int AS total_products,
+       (SELECT COUNT(*) FROM products p WHERE p.vendor_id = $1 AND p.status = 'active')::int AS active_products,
+       COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.vendor_id = $1), 0) AS avg_rating,
+       (SELECT COUNT(*) FROM reviews r WHERE r.vendor_id = $1)::int AS review_count
+     FROM orders o
+     WHERE o.vendor_id = $1`,
     [vendorId]
   );
 
+  const row = result.rows[0] || {};
   return {
-    total_orders: parseInt(orderResult.rows[0].total_orders, 10),
-    total_revenue: parseInt(orderResult.rows[0].total_revenue, 10),
-    commission_due: parseInt(orderResult.rows[0].commission_due, 10),
-    avg_rating: parseFloat(ratingResult.rows[0].avg_rating)
+    totalRevenue: Number(row.total_revenue || 0),
+    monthRevenue: Number(row.month_revenue || 0),
+    totalOrders: Number(row.total_orders || 0),
+    pendingOrders: Number(row.pending_orders || 0),
+    totalProducts: Number(row.total_products || 0),
+    activeProducts: Number(row.active_products || 0),
+    commissionDue: Number(row.commission_due || 0),
+    avgRating: Number(row.avg_rating || 0),
+    reviewCount: Number(row.review_count || 0),
   };
 };
 

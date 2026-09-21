@@ -1,179 +1,160 @@
 // src/components/vendor/DeliverySlipModal.jsx
-// Modal de Bordereau de Livraison A4 Imprimable avec QR Code d'Expédition pour Vendeurs Bouaké
+// Bordereau d'expédition et étiquette de colis imprimable pour le Magasin Central de Bouaké
 
-import React from 'react';
-import { X, Printer, QrCode, Store, MapPin, Calendar, CheckCircle2, ShieldCheck, Package } from 'lucide-react';
+import React, { useRef } from 'react';
+import { Printer, X, ShieldCheck, MapPin, Phone, Package, Calendar } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
-const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
+export default function DeliverySlipModal({ isOpen = true, order, onClose, vendorName, storeLocation }) {
+  const printRef = useRef(null);
 
-export default function DeliverySlipModal({ isOpen, onClose, order, vendorName, storeLocation }) {
-  if (!isOpen || !order) return null;
+  if (isOpen === false || !order) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const orderId = order.id || order.orderId || '847291';
-  const createdDate = order.createdAt ? new Date(order.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('fr-FR');
-  const items = order.items || [
-    { title: order.product_name || order.title || 'Article Anouan Express', quantity: order.quantity || 1, unit_price: order.total_amount || 15000 }
-  ];
-
-  const totalAmount = order.total_amount || items.reduce((acc, i) => acc + (i.unit_price || i.price || 0) * (i.quantity || 1), 0);
+  const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
+  const qrData = order.pickup_code || `ANOUAN-CMD-${order.id}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white text-slate-900 rounded-3xl shadow-2xl overflow-hidden print:m-0 print:shadow-none print:w-full print:max-w-none print:rounded-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+      {/* Boutons d'action hors impression */}
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         
-        {/* Header Action Bar (Hidden when printing) */}
-        <div className="flex items-center justify-between p-4 bg-slate-900 text-white print:hidden">
-          <div className="flex items-center gap-2">
-            <Package className="w-5 h-5 text-orange-500" />
-            <span className="font-bold text-sm">Bordereau de Livraison — Commande #{orderId}</span>
+        {/* Header non imprimable */}
+        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 print:hidden">
+          <div className="flex items-center gap-2 text-white font-black text-sm">
+            <Package className="text-orange-500" size={20} />
+            <span>Bordereau de Dépôt Magasin Central</span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-md"
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-1.5 hover:scale-105 transition-transform"
             >
-              <Printer className="w-4 h-4" />
-              Imprimer le Bordereau
+              <Printer size={16} /> Imprimer l'Étiquette
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white rounded-xl transition-all"
+              className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X size={18} />
             </button>
           </div>
         </div>
 
-        {/* Printable Document Body */}
-        <div className="p-8 space-y-6 print:p-6" id="printable-delivery-slip">
-          {/* Header Branding */}
-          <div className="flex items-start justify-between border-b border-slate-200 pb-6">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-black text-orange-500 tracking-tight">ANOUAN</span>
-                <span className="text-2xl font-black text-slate-900 tracking-tight">EXPRESS</span>
+        {/* Zone imprimable (Fiche Blanche Haute Définition) */}
+        <div className="p-6 overflow-y-auto bg-slate-950 print:bg-white print:p-0">
+          <div
+            ref={printRef}
+            className="bg-white text-slate-900 rounded-2xl p-6 border border-slate-200 shadow-sm print:shadow-none print:border-0 print:m-0"
+          >
+            {/* Entête bordereau */}
+            <div className="flex items-start justify-between border-b-2 border-orange-500 pb-4 mb-4">
+              <div>
+                <h1 className="text-2xl font-black text-slate-950 uppercase tracking-wider flex items-center gap-2">
+                  <span className="text-orange-600">ANOUAN</span> EXPRESS
+                </h1>
+                <p className="text-xs font-bold text-slate-600 mt-0.5">
+                  Hub Logistique & Magasin Central — Bouaké, Côte d'Ivoire
+                </p>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                  <Calendar size={12} /> Date : {new Date(order.created_at || Date.now()).toLocaleDateString('fr-CI')}
+                </div>
               </div>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                Marché Digital & Points Relais de Proximité — Côte d&apos;Ivoire
-              </p>
-              <div className="inline-flex items-center gap-1.5 mt-2 bg-orange-50 border border-orange-200 px-3 py-1 rounded-full text-orange-700 text-xs font-semibold">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Bordereau Officiel de Dépôt Magasin Central
+
+              {/* QR Code pour scan rapide par l'agent au guichet */}
+              <div className="flex flex-col items-center">
+                <div className="p-1.5 bg-white border border-slate-300 rounded-xl shadow-xs">
+                  <QRCodeSVG value={qrData} size={74} level="M" />
+                </div>
+                <span className="text-[10px] font-mono font-bold text-slate-700 mt-1">
+                  {order.pickup_code || `#${String(order.id).slice(0, 8)}`}
+                </span>
               </div>
             </div>
 
-            {/* QR Code & Order Ref */}
-            <div className="text-right flex flex-col items-end">
-              <div className="w-24 h-24 p-2 bg-slate-50 border-2 border-slate-900 rounded-xl flex items-center justify-center mb-2">
-                {/* SVG Simulated QR Code */}
-                <svg className="w-full h-full text-slate-900" viewBox="0 0 100 100" fill="currentColor">
-                  <path d="M0,0 h35 v35 h-35 z M10,10 v15 h15 v-15 z M65,0 h35 v35 h-35 z M75,10 v15 h15 v-15 z M0,65 h35 v35 h-35 z M10,75 v15 h15 v-15 z M45,10 h10 v10 h-10 z M45,45 h10 v10 h-10 z M65,45 h10 v10 h-10 z M85,45 h10 v10 h-10 z M45,65 h10 v20 h-10 z M65,65 h20 v10 h-20 z M75,85 h20 v10 h-20 z" />
-                </svg>
+            {/* Informations Expédition & Destination */}
+            <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <p className="font-bold text-slate-400 uppercase text-[10px] mb-1">Dépôt par le Vendeur :</p>
+                <p className="font-black text-slate-900 text-sm">{order.vendor_name || 'Boutique Partenaire'}</p>
+                <p className="text-slate-600 mt-0.5 flex items-center gap-1">
+                  <Phone size={12} /> Contact : {order.vendor_phone || 'Non renseigné'}
+                </p>
               </div>
-              <span className="text-xs font-mono font-bold text-slate-700">REF: ANX-{orderId}</span>
-              <span className="text-[10px] text-slate-400 font-mono">CODE: {order.pickupCode || '8472'}</span>
-            </div>
-          </div>
 
-          {/* Expedition & Destination Details */}
-          <div className="grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-            <div>
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
-                Expéditeur (Vendeur)
-              </span>
-              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                <Store className="w-4 h-4 text-orange-500" />
-                {vendorName || order.vendor_name || 'Maison du Pagne Kita Bouaké'}
+              <div className="p-3 bg-orange-50/60 rounded-xl border border-orange-200">
+                <p className="font-bold text-orange-600 uppercase text-[10px] mb-1">Point de Retrait Magasin :</p>
+                <p className="font-black text-slate-900 text-sm">
+                  {order.store_name || 'Magasin Central Anouan Express'}
+                </p>
+                <p className="text-slate-600 mt-0.5 flex items-center gap-1">
+                  <MapPin size={12} className="text-orange-500" /> Bouaké, Quartier Commerce / Marché
+                </p>
               </div>
-              <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                {storeLocation || 'Quartier Commerce, Bouaké'}
-              </p>
             </div>
 
-            <div>
-              <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block mb-1">
-                Destination (Point Relais)
-              </span>
-              <div className="flex items-center gap-2 font-bold text-slate-900 text-sm">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-                Magasin Central Anouan Express
+            {/* Destinataire Client */}
+            <div className="mb-6 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+              <p className="font-bold text-slate-400 uppercase text-[10px] mb-1">Client Destinataire :</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-black text-slate-900 text-sm">{order.client_name || 'Client Anouan'}</p>
+                  <p className="text-slate-600 flex items-center gap-1 mt-0.5">
+                    <Phone size={12} /> {order.client_phone || 'Téléphone masqué pour sécurité'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-black rounded-lg text-[11px]">
+                    Commande #{String(order.id).slice(0, 8)}
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-slate-600 mt-1">
-                Rue des Banques, près de la pharmacie principale, Bouaké
-              </p>
             </div>
-          </div>
 
-          {/* Order Metadata */}
-          <div className="flex items-center justify-between text-xs text-slate-600 border-b border-slate-200 pb-4">
-            <div className="flex items-center gap-1.5">
-              <Calendar className="w-4 h-4 text-slate-400" />
-              <span>Date de commande : <strong>{createdDate}</strong></span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Statut Paiement : <strong className="text-emerald-700 uppercase">{order.payment_status || 'Payé (Mobile Money)'}</strong></span>
-            </div>
-          </div>
-
-          {/* Items Table */}
-          <div>
-            <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="border-b-2 border-slate-900 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                  <th className="py-2">Article / Description</th>
-                  <th className="py-2 text-center">Quantité</th>
-                  <th className="py-2 text-right">Prix Unitaire</th>
-                  <th className="py-2 text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {items.map((item, idx) => (
-                  <tr key={idx} className="text-slate-800 font-medium">
-                    <td className="py-3 font-semibold">{item.title || item.name || 'Produit'}</td>
-                    <td className="py-3 text-center font-bold">{item.quantity || 1}</td>
-                    <td className="py-3 text-right">{formatPrice(item.unit_price || item.price || 0)}</td>
-                    <td className="py-3 text-right font-bold text-slate-900">
-                      {formatPrice((item.unit_price || item.price || 0) * (item.quantity || 1))}
-                    </td>
+            {/* Tableau des articles dans le colis */}
+            <div className="mb-6">
+              <table className="w-full text-xs text-left">
+                <thead>
+                  <tr className="border-b-2 border-slate-200 text-slate-500 uppercase text-[10px]">
+                    <th className="pb-2">Article</th>
+                    <th className="pb-2 text-center">Quantité</th>
+                    <th className="pb-2 text-right">Montant</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Total & Signatures */}
-          <div className="border-t-2 border-slate-900 pt-4 flex items-end justify-between">
-            <div className="space-y-1 text-xs text-slate-500 max-w-xs">
-              <p className="font-bold text-slate-800">Directives d&apos;Expédition :</p>
-              <p>1. Déposez ce bordereau signé avec le colis au magasin central.</p>
-              <p>2. L&apos;agent scannera le QR Code ci-dessus pour accuser réception.</p>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(order.vendor_items || order.items || [order]).map((item, idx) => (
+                    <tr key={idx} className="py-2">
+                      <td className="py-2.5 font-bold text-slate-900">
+                        {item.title || item.product_name || 'Article'}
+                      </td>
+                      <td className="py-2.5 text-center font-bold text-slate-700">
+                        x{item.quantity || 1}
+                      </td>
+                      <td className="py-2.5 text-right font-black text-slate-900">
+                        {formatPrice(item.unit_price || item.price || order.total_amount)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            <div className="text-right">
-              <span className="text-xs text-slate-500 block">Total à Réception :</span>
-              <span className="text-2xl font-black text-slate-900">{formatPrice(totalAmount)}</span>
-            </div>
-          </div>
-
-          {/* Signature Grid */}
-          <div className="grid grid-cols-2 gap-8 pt-8 border-t border-dashed border-slate-300 text-xs text-slate-500">
-            <div className="h-20 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
-              <span className="font-bold text-slate-700">Signature Vendeur :</span>
-              <span className="text-[10px] text-slate-400">Date : ____/____/2026</span>
-            </div>
-            <div className="h-20 border border-slate-200 rounded-xl p-3 flex flex-col justify-between">
-              <span className="font-bold text-slate-700">Tampon Réception Agent Bouaké :</span>
-              <span className="text-[10px] text-slate-400">Heure de dépôt : ____:____</span>
+            {/* Pied de page et Consignes de dépôt */}
+            <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+              <ShieldCheck size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Instructions pour le vendeur :</p>
+                <p className="text-[10px] mt-0.5 text-amber-800 leading-relaxed">
+                  Collez ou insérez ce bordereau avec le colis avant de le déposer au guichet du Magasin Central. 
+                  L'agent scannera le QR Code pour valider la prise en charge et notifier le client.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

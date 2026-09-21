@@ -12,5 +12,6 @@ router.get('/:id', authenticateOptional, storesController.getById);
 router.post('/', authenticate, authorize('admin'), validate({ body: createStoreSchema }), storesController.create);
 router.put('/:id', authenticate, authorize('admin'), validate({ body: updateStoreSchema }), storesController.update);
 router.patch('/:id/toggle', authenticate, authorize('admin'), storesController.toggleActive);
+router.delete('/:id', authenticate, authorize('admin'), storesController.delete);
 
 module.exports = router;

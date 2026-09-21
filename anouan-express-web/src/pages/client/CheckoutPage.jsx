@@ -3,13 +3,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, CreditCard, CheckCircle, ChevronRight, ShoppingBag, ShieldCheck, AlertCircle, Loader2, Smartphone, CheckCircle2, Lock, ArrowRight, Tag, Sparkles } from 'lucide-react';
+import { MapPin, CreditCard, CheckCircle, ChevronRight, ShoppingBag, ShieldCheck, AlertCircle, Loader2, Smartphone, CheckCircle2, Lock, ArrowRight, Tag, Sparkles, Star } from 'lucide-react';
 import { useCart } from '../../contexts/CartContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { ordersAPI, storesAPI, paymentsAPI } from '../../services/api';
 import { useToast } from '../../components/ui/Toast';
 import PaymentLogo from '../../components/ui/PaymentLogos';
 import PageHeader from '../../components/ui/PageHeader';
+import MobilePaymentModal from '../../components/client/MobilePaymentModal';
 
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 
@@ -35,14 +36,29 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Programme de fidélité Anouan Club
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [useLoyalty, setUseLoyalty] = useState(false);
+  const [loyaltyToUse, setLoyaltyToUse] = useState(0);
+
   // State Modal Paiement Mobile Money
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [modalStep, setModalStep] = useState(1); // 1: confirmation, 2: saisie code PIN, 3: validation
   const [pinCode, setPinCode] = useState('');
   const [pendingOrder, setPendingOrder] = useState(null);
+  const [activePaymentUrl, setActivePaymentUrl] = useState('');
+  const [pollingOrderId, setPollingOrderId] = useState(null);
 
   useEffect(() => {
     loadStores();
+    // Charger le solde de points fidélité
+    import('../../services/api').then(({ usersAPI }) => {
+      usersAPI.getMe().then((res) => {
+        const pts = res.data?.data?.loyalty_points ?? res.data?.loyalty_points ?? 0;
+        setLoyaltyBalance(pts);
+        setLoyaltyToUse(Math.min(pts, Math.floor(pts / 2))); // Pré-remplir avec le max utilisable
+      }).catch(() => {});
+    });
   }, []);
 
   const loadStores = async () => {
@@ -81,7 +97,8 @@ export default function CheckoutPage() {
 
   const platformFee = 500;
   const discount = discountAmount || 0;
-  const total = Math.max(0, totalPrice + (items.length > 0 ? platformFee : 0) - discount);
+  const loyaltyDiscount = useLoyalty ? Math.floor(loyaltyToUse / 2) : 0; // 2 pts = 1 FCFA
+  const total = Math.max(0, totalPrice + (items.length > 0 ? platformFee : 0) - discount - loyaltyDiscount);
 
   const handleInitiateOrder = async () => {
     if (items.length === 0) {
@@ -99,21 +116,21 @@ export default function CheckoutPage() {
 
     setError('');
 
-    // Si cash, pas de modal mobile money
+    // Si cash, création directe
     if (paymentMethod === 'cash') {
-      executeOrderCreation();
+      executeCashOrder();
     } else {
-      setShowPaymentModal(true);
-      setModalStep(1);
+      initiateMobilePaymentOrder();
     }
   };
 
-  const executeOrderCreation = async () => {
+  const executeCashOrder = async () => {
     setSubmitting(true);
     try {
       const orderPayload = {
         storeId: selectedStore.id,
-        paymentMethod,
+        paymentMethod: 'cash',
+        loyaltyPointsUsed: useLoyalty ? loyaltyToUse : 0,
         items: items.map((i) => ({
           productId: i.id || i.productId,
           quantity: i.quantity,
@@ -123,24 +140,57 @@ export default function CheckoutPage() {
       const orderRes = await ordersAPI.create(orderPayload);
       const createdOrder = orderRes.data?.data || orderRes.data;
 
-      if (paymentMethod !== 'cash') {
-        await paymentsAPI.initiate({
-          orderId: createdOrder.id,
-          phoneNumber: phone,
-          provider: paymentMethod,
-        }).catch(() => null);
-      }
-
       window.dispatchEvent(new CustomEvent('anouan_order_status_updated', { detail: { id: createdOrder.id, status: createdOrder.status || 'created' } }));
-
       clearCart();
-      toast.success('Commande validée avec succès dans la base de données !');
+      toast.success('Commande enregistrée ! Paiement en espèces au retrait.');
       navigate(`/orders/${createdOrder.id}/tracking`);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Erreur lors de la validation. Réessayez.');
     } finally {
       setSubmitting(false);
-      setShowPaymentModal(false);
+    }
+  };
+
+  const initiateMobilePaymentOrder = async () => {
+    setSubmitting(true);
+    try {
+      const orderPayload = {
+        storeId: selectedStore.id,
+        paymentMethod,
+        loyaltyPointsUsed: useLoyalty ? loyaltyToUse : 0,
+        items: items.map((i) => ({
+          productId: i.id || i.productId,
+          quantity: i.quantity,
+        })),
+      };
+
+      const orderRes = await ordersAPI.create(orderPayload);
+      const createdOrder = orderRes.data?.data || orderRes.data;
+      setPendingOrder(createdOrder);
+
+      const paymentRes = await paymentsAPI.initiate({
+        orderId: createdOrder.id,
+        phoneNumber: phone,
+        provider: paymentMethod,
+      });
+
+      const payment = paymentRes.data?.data || paymentRes.data || {};
+      setActivePaymentUrl(payment.paymentUrl || '');
+      setPollingOrderId(createdOrder.id);
+      setShowPaymentModal(true);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Erreur lors de l’initiation du paiement. Réessayez.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false);
+    clearCart();
+    toast.success('Paiement validé avec succès !');
+    if (pendingOrder?.id || pollingOrderId) {
+      navigate(`/orders/${pendingOrder?.id || pollingOrderId}/tracking`);
     }
   };
 
@@ -225,12 +275,22 @@ export default function CheckoutPage() {
                     </div>
                   )}
 
-                  <button
-                    onClick={() => setStep(2)}
-                    className="mt-4 bg-orange-500 text-slate-950 font-black rounded-2xl hover:bg-orange-400 shadow-lg shadow-orange-500/20 px-8 py-3.5 transition-all text-xs uppercase tracking-wider"
-                  >
-                    Continuer vers le paiement
-                  </button>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      onClick={() => setStep(2)}
+                      className="mt-4 bg-orange-500 text-slate-950 font-black rounded-2xl hover:bg-orange-400 shadow-lg shadow-orange-500/20 px-8 py-3.5 transition-all text-xs uppercase tracking-wider"
+                    >
+                      Continuer vers le paiement
+                    </button>
+                    <a
+                      href="/stores"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-4 inline-flex items-center gap-2 border border-orange-500/40 text-orange-400 hover:bg-orange-500/10 font-bold rounded-2xl px-5 py-3.5 text-xs transition-all"
+                    >
+                      <MapPin size={14} /> Voir sur la carte
+                    </a>
+                  </div>
                 </div>
               ) : (
                 <div className="pl-11 text-slate-400 text-xs flex items-center justify-between">
@@ -381,6 +441,12 @@ export default function CheckoutPage() {
                     <span>-{formatPrice(discount)}</span>
                   </div>
                 )}
+                {loyaltyDiscount > 0 && (
+                  <div className="flex justify-between text-amber-400 font-bold">
+                    <span className="flex items-center gap-1"><Star size={11} /> Points Anouan Club</span>
+                    <span>-{formatPrice(loyaltyDiscount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Frais de service plateforme</span>
                   <span className="text-white font-bold">{formatPrice(platformFee)}</span>
@@ -396,6 +462,44 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
+              {/* Bloc Anouan Club */}
+              {loyaltyBalance > 0 && (
+                <div className={`rounded-2xl p-4 border transition-all ${useLoyalty ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-950 border-slate-800'}`}>
+                  <label className="flex items-center justify-between cursor-pointer gap-3">
+                    <div className="flex items-center gap-2">
+                      <Star size={16} className="text-amber-400 shrink-0" />
+                      <div>
+                        <p className="text-white text-xs font-black">Points Anouan Club</p>
+                        <p className="text-slate-400 text-[10px]">{loyaltyBalance} pts disponibles (≈ {Math.floor(loyaltyBalance / 2)} FCFA)</p>
+                      </div>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={useLoyalty}
+                      onChange={(e) => setUseLoyalty(e.target.checked)}
+                      className="w-4 h-4 accent-amber-500"
+                    />
+                  </label>
+                  {useLoyalty && (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex justify-between text-[10px] text-slate-400">
+                        <span>Points à utiliser</span>
+                        <span className="text-amber-400 font-bold">{loyaltyToUse} pts = -{Math.floor(loyaltyToUse / 2)} FCFA</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={loyaltyBalance}
+                        step={2}
+                        value={loyaltyToUse}
+                        onChange={(e) => setLoyaltyToUse(Number(e.target.value))}
+                        className="w-full accent-amber-500"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="bg-slate-950 rounded-2xl p-4 flex items-start gap-3 border border-slate-800">
                 <ShieldCheck className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
                 <p className="text-slate-400 text-xs leading-relaxed">
@@ -406,104 +510,17 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Modal de Confirmation Paiement Mobile Money */}
-        {showPaymentModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
-            <div className="glass-panel w-full max-w-md rounded-3xl p-6 border border-slate-800 space-y-6 shadow-2xl animate-in fade-in zoom-in-95 text-center">
-              
-              {/* En-tête opérateur avec logo officiel */}
-              <div className="space-y-2">
-                <div className="flex justify-center">
-                  <PaymentLogo provider={paymentMethod} size={64} />
-                </div>
-                <h3 className="text-xl font-black text-white">Validation {currentOp.name}</h3>
-                <p className="text-xs text-slate-400">Demande de paiement envoyée au <strong className="text-orange-400">{phone}</strong></p>
-              </div>
-
-              {/* Étape 1 : Push USSD / Notification */}
-              {modalStep === 1 && (
-                <div className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-slate-800 text-xs">
-                  <div className="flex items-center justify-between text-slate-300 font-bold border-b border-slate-800 pb-2">
-                    <span>Montant à prélever :</span>
-                    <span className="text-orange-400 text-sm font-black">{formatPrice(total)}</span>
-                  </div>
-
-                  <p className="text-slate-400 leading-relaxed text-left">
-                    Une notification Push USSD a été envoyée sur votre téléphone. Tapez votre code secret <strong className="text-white">{currentOp.name}</strong> sur le téléphone ou ci-dessous pour confirmer.
-                  </p>
-
-                  <div className="pt-2">
-                    <button
-                      onClick={() => setModalStep(2)}
-                      className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black rounded-2xl transition-all shadow-lg text-xs uppercase tracking-wider"
-                    >
-                      Saisir le Code PIN & Valider
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Étape 2 : Saisie Code PIN de validation */}
-              {modalStep === 2 && (
-                <div className="space-y-4 bg-slate-900/80 p-5 rounded-2xl border border-slate-800 text-xs">
-                  <p className="text-slate-300 font-bold">Entrez votre Code Secret (Simulation)</p>
-                  
-                  <div className="flex justify-center gap-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <input
-                        key={i}
-                        type="password"
-                        maxLength={1}
-                        value={pinCode[i - 1] || ''}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setPinCode((prev) => {
-                            const arr = prev.split('');
-                            arr[i - 1] = val;
-                            return arr.join('');
-                          });
-                        }}
-                        className="w-12 h-14 bg-slate-950 border border-slate-700 rounded-2xl text-center text-xl text-orange-400 font-black outline-none focus:border-orange-500"
-                      />
-                    ))}
-                  </div>
-
-                  <p className="text-[10px] text-slate-500">Paiement sécurisé crypté SSL 256 bits Anouan Express</p>
-
-                  <button
-                    onClick={() => {
-                      setModalStep(3);
-                      setTimeout(() => executeOrderCreation(), 1200);
-                    }}
-                    className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-slate-950 font-black rounded-2xl transition-all shadow-lg text-xs uppercase tracking-wider"
-                  >
-                    Valider le Paiement
-                  </button>
-                </div>
-              )}
-
-              {/* Étape 3 : Traitement & Succès */}
-              {modalStep === 3 && (
-                <div className="space-y-4 py-4">
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center mx-auto animate-bounce">
-                    <CheckCircle2 size={36} />
-                  </div>
-                  <h4 className="text-lg font-black text-white">Paiement Accepté !</h4>
-                  <p className="text-xs text-slate-400">Génération de votre code QR de retrait en cours...</p>
-                </div>
-              )}
-
-              {modalStep < 3 && (
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="text-xs text-slate-500 hover:text-slate-300 font-bold"
-                >
-                  Annuler le paiement
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Modal de Confirmation Paiement Mobile Money & Polling CinetPay */}
+        <MobilePaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={handlePaymentSuccess}
+          orderId={pollingOrderId || pendingOrder?.id}
+          provider={paymentMethod}
+          paymentUrl={activePaymentUrl}
+          amount={total}
+          phoneNumber={phone}
+        />
       </div>
     </div>
   );

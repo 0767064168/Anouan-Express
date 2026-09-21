@@ -1,4 +1,5 @@
 const db = require('../src/config/database');
+const bcrypt = require('bcryptjs');
 
 jest.mock('../src/config/database', () => ({
   query: jest.fn(),
@@ -109,5 +110,54 @@ describe('auth.service password reset', () => {
     await expect(
       authService.verifyOTP({ phone: '+2250700000000', otp: '123456' })
     ).rejects.toMatchObject({ code: 'ACCOUNT_BANNED' });
+  });
+
+  it('rejects password login for a vendor waiting for admin activation', async () => {
+    const passwordHash = await bcrypt.hash('secret123', 4);
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        id: 'vendor-user',
+        name: 'Vendeur Test',
+        email: 'vendor@example.com',
+        password_hash: passwordHash,
+        role: 'client',
+        status: 'active',
+        vendor_validation_status: 'pending',
+      }],
+    });
+
+    await expect(
+      authService.loginWithPassword({ email: 'vendor@example.com', password: 'secret123' })
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'VENDOR_NOT_APPROVED',
+    });
+
+    expect(db.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows password login for an approved vendor', async () => {
+    const passwordHash = await bcrypt.hash('secret123', 4);
+    db.query
+      .mockResolvedValueOnce({
+        rows: [{
+          id: 'vendor-user',
+          name: 'Vendeur Test',
+          email: 'vendor@example.com',
+          password_hash: passwordHash,
+          role: 'vendor',
+          status: 'active',
+          vendor_validation_status: 'approved',
+        }],
+      })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const result = await authService.loginWithPassword({
+      email: 'vendor@example.com',
+      password: 'secret123',
+    });
+
+    expect(result.user).toMatchObject({ id: 'vendor-user', role: 'vendor' });
+    expect(result.accessToken).toEqual(expect.any(String));
   });
 });

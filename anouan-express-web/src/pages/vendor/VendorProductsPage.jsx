@@ -3,10 +3,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus, Search, Edit, Trash2, Package, X, Upload,
+  Plus, Search, Edit, Trash2, Package, X, Upload, Camera,
   Loader2, CheckCircle, AlertTriangle, Sparkles, Wand2, Bot, Star, Image as ImageIcon, FileText
 } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../../services/api';
+import { compressImage } from '../../utils/imageCompressor';
 import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (price) => new Intl.NumberFormat('fr-CI').format(Number(price || 0)) + ' FCFA';
@@ -69,6 +70,7 @@ export default function VendorProductsPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const fileRef = useRef();
+  const cameraRef = useRef();
 
   const [generatingAI, setGeneratingAI] = useState(false);
   const [aiTone, setAiTone] = useState('commercial');
@@ -130,7 +132,7 @@ export default function VendorProductsPage() {
     setLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        productsAPI.getAll({ limit: 100 }).catch(() => null),
+        productsAPI.getVendorProducts({ limit: 100 }).catch(() => null),
         categoriesAPI.getAll().catch(() => null),
       ]);
 
@@ -239,8 +241,8 @@ export default function VendorProductsPage() {
     }
 
     Promise.all(validFiles.map(async (file) => {
-      const compressedDataUrl = await compressImageFile(file);
-      return Object.assign(file, { preview: compressedDataUrl || URL.createObjectURL(file) });
+      const optimizedFile = await compressImage(file);
+      return Object.assign(optimizedFile, { preview: URL.createObjectURL(optimizedFile) });
     })).then((processedFiles) => {
       setForm((prev) => {
         const newImages = [...prev.images];
@@ -254,7 +256,7 @@ export default function VendorProductsPage() {
           images: newImages.slice(0, 10),
         };
       });
-      showToast(`${validFiles.length} image(s) ajoutée(s) et optimisée(s) !`);
+      showToast(`${validFiles.length} photo(s) optimisée(s) et prête(s) !`);
     });
   };
 
@@ -362,9 +364,20 @@ export default function VendorProductsPage() {
     }
   };
 
-  const filtered = products.filter((p) =>
-    (p.name || p.title || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const [filterTab, setFilterTab] = useState('all');
+
+  const flashCount = products.filter((p) => Boolean(p.flash_sale_active)).length;
+  const lowStockCount = products.filter((p) => Number(p.stock) <= 5).length;
+  const inactiveCount = products.filter((p) => p.is_active === false).length;
+
+  const filtered = products.filter((p) => {
+    const matchesSearch = (p.name || p.title || '').toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    if (filterTab === 'flash') return Boolean(p.flash_sale_active);
+    if (filterTab === 'low_stock') return Number(p.stock) <= 5;
+    if (filterTab === 'inactive') return p.is_active === false;
+    return true;
+  });
 
   return (
     <div className="space-y-5 bg-slate-950 p-6 min-h-screen">
@@ -401,16 +414,65 @@ export default function VendorProductsPage() {
         )}
       />
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher un produit..."
-          className="w-full sm:w-80 pl-9 pr-4 py-2.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-orange-500 outline-none transition-all"
-        />
+      {/* Search & Filters */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <button
+            type="button"
+            onClick={() => setFilterTab('all')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'all'
+                ? 'bg-orange-500 text-slate-950 shadow-lg shadow-orange-500/30'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            Tous <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{products.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('flash')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'flash'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            ⚡ Ventes Flash <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{flashCount}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('low_stock')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'low_stock'
+                ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            ⚠️ Stock Faible <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{lowStockCount}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('inactive')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'inactive'
+                ? 'bg-slate-700 text-white shadow-lg'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            Inactifs <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{inactiveCount}</span>
+          </button>
+        </div>
+
+        <div className="relative shrink-0">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un produit..."
+            className="w-full sm:w-64 pl-9 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-orange-500 outline-none transition-all"
+          />
+        </div>
       </div>
 
       {/* Grille de produits */}
@@ -714,13 +776,42 @@ export default function VendorProductsPage() {
                   <p className="text-xs font-bold text-white mb-1">
                     {isDragging ? 'Glissez vos images ici ! 🚀' : 'Glissez-déposez vos images ici ou cliquez pour parcourir'}
                   </p>
-                  <p className="text-[10px] text-slate-400">Formats supportés : PNG, JPG, JPEG, WEBP, GIF, SVG, AVIF, HEIC (jusqu'à 10 Mo par fichier)</p>
+                  <div className="flex flex-wrap items-center justify-center gap-3 mt-3">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        cameraRef.current?.click();
+                      }}
+                      className="px-4 py-2 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-400 hover:bg-orange-500/25 text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                      <Camera size={15} /> Prendre une Photo (Caméra)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileRef.current?.click();
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                      <Upload size={15} /> Ouvrir la Galerie
+                    </button>
+                  </div>
 
                   <input
                     ref={fileRef}
                     type="file"
                     accept="image/*,.png,.jpg,.jpeg,.webp,.gif,.svg,.avif,.heic"
                     multiple
+                    hidden
+                    onChange={handleImageChange}
+                  />
+                  <input
+                    ref={cameraRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
                     hidden
                     onChange={handleImageChange}
                   />

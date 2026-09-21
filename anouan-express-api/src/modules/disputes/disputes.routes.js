@@ -4,9 +4,19 @@ const disputesController = require('./disputes.controller');
 const { validateOpenDispute, validateResolveDispute } = require('./disputes.validation');
 const { authenticate } = require('../../middlewares/authenticate');
 const { authorize } = require('../../middlewares/authorize');
-const { auditMiddleware } = require('../../middlewares/auditLog'); // Assuming it exists
+const { auditMiddleware } = require('../../middlewares/auditLog');
+const { uploadDisputeImages } = require('../../middlewares/upload');
+const { optimizeUploadedImage } = require('../../middlewares/imageOptimizer');
 
-router.post('/', authenticate, authorize('client'), validateOpenDispute, disputesController.openDispute);
+router.post(
+  '/',
+  authenticate,
+  authorize('client'),
+  uploadDisputeImages,
+  optimizeUploadedImage,
+  validateOpenDispute,
+  disputesController.openDispute
+);
 router.get('/my', authenticate, authorize('client'), disputesController.getMyDisputes);
 router.get('/', authenticate, authorize('admin'), disputesController.getAllDisputes);
 router.get('/:id', authenticate, disputesController.getDisputeById);

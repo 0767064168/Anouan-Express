@@ -51,6 +51,13 @@ export default function LoginPage() {
     return '/';
   };
 
+  const getLoginErrorMessage = (err, fallback) => {
+    if (err.response?.data?.code === 'VENDOR_NOT_APPROVED') {
+      return 'Votre compte vendeur est en attente d’activation par l’administrateur.';
+    }
+    return err.response?.data?.message || fallback;
+  };
+
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -61,7 +68,7 @@ export default function LoginPage() {
       toast.success(`Bienvenue ${data?.user?.name || ''} !`);
       navigate(getRoleRedirect(role), { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Email ou mot de passe incorrect.';
+      const msg = getLoginErrorMessage(err, 'Email ou mot de passe incorrect.');
       setError(msg);
       toast.error(msg);
     } finally {
@@ -97,7 +104,7 @@ export default function LoginPage() {
       toast.success('Connexion OTP réussie !');
       navigate(getRoleRedirect(role), { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.message || 'Code OTP invalide ou expiré.';
+      const msg = getLoginErrorMessage(err, 'Code OTP invalide ou expiré.');
       setError(msg);
       toast.error(msg);
     } finally {

@@ -13,6 +13,8 @@ import { useProducts, getFallbackProductImage } from '../../contexts/ProductCont
 import { productsAPI, categoriesAPI, adminAPI } from '../../services/api';
 import { PaymentMethodsRow } from '../../components/ui/PaymentLogos';
 import Emoji from '../../components/ui/Emoji';
+import RecentlyViewed from '../../components/client/RecentlyViewed';
+import FlashSaleCountdown from '../../components/client/FlashSaleCountdown';
 
 const formatPrice = (p) => typeof p === 'number' ? new Intl.NumberFormat('fr-CI').format(p) + ' FCFA' : p;
 
@@ -156,15 +158,15 @@ const HomePage = () => {
           const mapped = activeOnes.map((b) => ({
             id: b.id,
             title: b.title || 'Grand Arrivage Anouan Express',
-            subtitle: 'Retrait rapide dans votre magasin central de Bouaké.',
-            badge: '⚡ Annonce Officielle',
-            gradient: 'from-orange-500 to-amber-500',
+            subtitle: b.subtitle || 'Retrait rapide dans votre magasin central de Bouaké.',
+            badge: b.badge || '⚡ Annonce Officielle',
+            gradient: b.theme_color || 'from-orange-500 to-amber-500',
             hasPagneBg: true,
-            productName: b.title,
-            productPrice: 25000,
-            productOldPrice: 35000,
+            productName: b.product_name || b.title,
+            productPrice: Number(b.product_price || 25000),
+            productOldPrice: Number(b.product_old_price || 35000),
             productImage: b.image_url || IMAGES.pagneKita,
-            category: 'mode',
+            category: b.category || 'mode',
           }));
           setSlides(mapped);
           setActiveBanners(activeOnes);
@@ -537,24 +539,19 @@ const HomePage = () => {
               <h2 className="text-3xl font-black text-white tracking-tight">Ventes Flash Quotidiennes</h2>
             </div>
 
-            {/* Compteur Ventes Flash */}
-            <div className="flex items-center gap-3 bg-slate-950/90 border border-amber-500/40 px-6 py-3 rounded-2xl shadow-2xl border-kita-glow">
-              <Clock className="w-5 h-5 text-amber-400 animate-spin" style={{ animationDuration: '8s' }} />
-              <div className="flex items-center gap-1.5 text-amber-400 font-mono font-black text-xl">
-                <span>{String(timeLeft.hours).padStart(2, '0')}</span>:
-                <span>{String(timeLeft.mins).padStart(2, '0')}</span>:
-                <span>{String(timeLeft.secs).padStart(2, '0')}</span>
-              </div>
-            </div>
+            {/* Compteur Ventes Flash — Dynamique */}
+            <FlashSaleCountdown />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {flashProducts.map((product) => (
               <div key={product.id} className="glass-card rounded-3xl overflow-hidden flex flex-col justify-between group border-slate-800 hover:border-orange-500/50">
                 <Link to={`/products/${product.id}`} className="block relative">
-                  <span className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 text-[10px] font-black px-3 py-1 rounded-full z-10 shadow-lg uppercase tracking-wider">
-                    PROMO -50%
-                  </span>
+                  {product.oldPrice && product.oldPrice > product.price && (
+                    <span className="absolute top-3 right-3 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 text-[10px] font-black px-3 py-1 rounded-full z-10 shadow-lg uppercase tracking-wider">
+                      -{Math.round(((product.oldPrice - product.price) / product.oldPrice) * 100)}%
+                    </span>
+                  )}
                   <div className="h-52 bg-slate-900/80 overflow-hidden relative">
                     <img
                       src={product.image || getFallbackProductImage(product.name)}
@@ -648,6 +645,11 @@ const HomePage = () => {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Articles Vus Récemment */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <RecentlyViewed title="Vos Articles Récemment Consultés" />
       </section>
     </div>
   );

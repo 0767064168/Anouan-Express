@@ -6,9 +6,10 @@ const CSRF_HEADER = 'x-csrf-token';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const createCsrfToken = () => crypto.randomBytes(32).toString('hex');
+const isAuthRoute = (req) => req.path === '/api/auth/login' || req.path === '/api/auth/register' || req.path === '/api/auth/otp/send' || req.path === '/api/auth/otp/verify' || req.path === '/api/auth/password/forgot' || req.path === '/api/auth/password/reset';
 
 const csrfProtection = (req, res, next) => {
-  if (SAFE_METHODS.has(req.method) || !req.cookies?.accessToken) return next();
+  if (SAFE_METHODS.has(req.method) || !req.cookies?.accessToken || isAuthRoute(req)) return next();
 
   const cookieToken = req.cookies[CSRF_COOKIE];
   const headerToken = req.get(CSRF_HEADER);

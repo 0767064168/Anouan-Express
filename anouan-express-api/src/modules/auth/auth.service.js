@@ -78,7 +78,12 @@ const register = async ({ name, email, phone, password, role = 'client', shopNam
 const loginWithPassword = async ({ email, password }) => {
   try {
     const result = await query(
-      'SELECT id, name, email, phone, password_hash, role, status, avatar_url FROM users WHERE email = $1',
+      `SELECT users.id, users.name, users.email, users.phone, users.password_hash, users.role, users.status,
+           users.avatar_url, users.store_id, stores.name AS store_name, stores.city AS store_city,
+           v.validation_status AS vendor_validation_status
+       FROM users LEFT JOIN stores ON stores.id = users.store_id
+         LEFT JOIN vendors v ON v.user_id = users.id
+       WHERE users.email = $1`,
       [email]
     );
     if (!result.rows.length) throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
@@ -88,6 +93,9 @@ const loginWithPassword = async ({ email, password }) => {
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) throw new AppError('Email ou mot de passe incorrect.', 401, 'INVALID_CREDENTIALS');
+    if (user.vendor_validation_status && user.vendor_validation_status !== 'approved') {
+      throw new AppError('Votre compte vendeur doit être activé par un administrateur avant la connexion.', 403, 'VENDOR_NOT_APPROVED');
+    }
 
     const tokens = generateTokens(user.id, user.role);
     await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
@@ -122,7 +130,10 @@ const sendOTP = async ({ phone }) => {
 
 const verifyOTP = async ({ phone, otp }) => {
   const result = await query(
-    'SELECT id, name, email, phone, role, status, otp_code, otp_expires_at FROM users WHERE phone = $1',
+    `SELECT users.id, users.name, users.email, users.phone, users.role, users.status,
+        users.otp_code, users.otp_expires_at, v.validation_status AS vendor_validation_status
+     FROM users LEFT JOIN vendors v ON v.user_id = users.id
+     WHERE users.phone = $1`,
     [phone]
   );
   if (!result.rows.length) throw new AppError('Numéro introuvable.', 404, 'PHONE_NOT_FOUND');
@@ -131,6 +142,9 @@ const verifyOTP = async ({ phone, otp }) => {
   if (user.status === 'banned') throw new AppError('Compte suspendu.', 403, 'ACCOUNT_BANNED');
   if (user.otp_code !== otp) throw new AppError('Code OTP invalide.', 401, 'INVALID_OTP');
   if (new Date() > new Date(user.otp_expires_at)) throw new AppError('Code OTP expiré.', 401, 'OTP_EXPIRED');
+  if (user.vendor_validation_status && user.vendor_validation_status !== 'approved') {
+    throw new AppError('Votre compte vendeur doit être activé par un administrateur avant la connexion.', 403, 'VENDOR_NOT_APPROVED');
+  }
 
   // Invalider l'OTP
   await query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = $1', [user.id]);

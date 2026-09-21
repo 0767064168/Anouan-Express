@@ -6,7 +6,7 @@ import { Link, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   Search, ShoppingCart, User, Menu, X, Bell, Heart, MapPin, MessageSquare,
   Home, LayoutGrid, LogOut, Package, Settings, ChevronDown, Store, Sparkles, ShieldCheck, Sun, Moon,
-  Smartphone, Headphones, Footprints
+  Smartphone, Headphones, Footprints, ShoppingBag
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCart } from '../../contexts/CartContext';
@@ -21,6 +21,7 @@ import { notificationsAPI, adminAPI } from '../../services/api';
 const navLinks = [
   { label: 'Accueil', path: '/', icon: Home },
   { label: 'Catalogue', path: '/catalog', icon: LayoutGrid },
+  { label: 'Points Relais', path: '/stores', icon: MapPin },
 ];
 
 const SEARCH_PRODUCTS = [
@@ -64,7 +65,11 @@ export default function ClientLayout() {
           setUnreadNotifsCount(list.filter(n => !n.is_read && !n.read).length);
         }
       } catch (err) {
-        console.error("Erreur chargement notifications:", err);
+        const status = err?.response?.status;
+        if (status !== 401 && status !== 403) {
+          console.warn('Unread notifications could not be loaded:', err?.message || 'unknown error');
+        }
+        setUnreadNotifsCount(0);
       }
     };
     loadUnreadNotifs();
@@ -380,7 +385,10 @@ export default function ClientLayout() {
                         <p className="text-[10px] text-orange-400 font-medium capitalize mt-0.5">{user?.role || 'Client'}</p>
                       </div>
                       <Link to="/profile" className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-colors">
-                        <User size={14} className="text-slate-400" /> Mon profil & Commandes
+                        <User size={14} className="text-slate-400" /> Mon profil
+                      </Link>
+                      <Link to="/orders" className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-colors">
+                        <ShoppingBag size={14} className="text-orange-400" /> Mes Commandes
                       </Link>
                       <Link to="/notifications" className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800/60 rounded-xl transition-colors">
                         <Bell size={14} className="text-slate-400" /> Notifications
@@ -495,6 +503,9 @@ export default function ClientLayout() {
               <div className="pt-2 border-t border-slate-700/60 mt-2 space-y-0.5">
                 {isAuthenticated && (
                   <>
+                    <Link to="/orders" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-100 hover:bg-slate-800 hover:text-white transition-all">
+                      <ShoppingBag size={19} className="text-orange-400 shrink-0" /> Mes Commandes
+                    </Link>
                     <Link to="/favorites" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-sm font-semibold text-slate-100 hover:bg-slate-800 hover:text-white transition-all">
                       <Heart size={19} className="text-red-400 shrink-0" /> Mes favoris
                       {favCount > 0 && <span className="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{favCount}</span>}
@@ -568,6 +579,7 @@ export default function ClientLayout() {
                 <li><Link to="/" className="hover:text-orange-400 transition-colors">Accueil</Link></li>
                 <li><Link to="/catalog" className="hover:text-orange-400 transition-colors">Catalogue complet</Link></li>
                 <li><Link to="/catalog" className="hover:text-orange-400 transition-colors">Ventes Flash</Link></li>
+                <li><Link to="/stores" className="hover:text-orange-400 transition-colors flex items-center gap-1"><MapPin size={11} className="text-orange-400" /> Points Relais Bouaké</Link></li>
               </ul>
             </div>
             <div>

@@ -2,7 +2,7 @@ const adminService = require('./admin.service');
 
 const getBanners = async (req, res, next) => {
   try {
-    const activeOnly = req.query.all !== 'true';
+    const activeOnly = req.path.startsWith('/public/') || req.query.activeOnly === 'true';
     const data = await adminService.getBanners(activeOnly);
     res.json({ success: true, data });
   } catch (err) {
@@ -67,6 +67,20 @@ const createFlashSale = async (req, res, next) => {
   }
 };
 
+const createFlashSales = async (req, res, next) => {
+  try {
+    const data = await adminService.createFlashSales(req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
+const updateFlashSale = async (req, res, next) => {
+  try {
+    const data = await adminService.updateFlashSale(req.params.id, req.body);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+};
+
 const deleteFlashSale = async (req, res, next) => {
   try {
     await adminService.deleteFlashSale(req.params.id);
@@ -74,6 +88,13 @@ const deleteFlashSale = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+};
+
+const toggleFlashSaleActive = async (req, res, next) => {
+  try {
+    const data = await adminService.toggleFlashSaleActive(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
 };
 
 const getStats = async (req, res, next) => {
@@ -107,6 +128,42 @@ const updateSetting = async (req, res, next) => {
 const getUserRoles = async (req, res, next) => {
   try {
     const data = await adminService.getUserRoles();
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const createAdmin = async (req, res, next) => {
+  try {
+    const data = await adminService.createAdmin(req.user.id, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const createAgent = async (req, res, next) => {
+  try {
+    const data = await adminService.createAgent(req.user.id, req.body);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const assignAgentStore = async (req, res, next) => {
+  try {
+    const data = await adminService.assignAgentStore(req.user.id, req.params.userId, req.body.storeId);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateAgent = async (req, res, next) => {
+  try {
+    const data = await adminService.updateAgent(req.user.id, req.params.userId, req.body);
     res.json({ success: true, data });
   } catch (err) {
     next(err);
@@ -148,11 +205,18 @@ module.exports = {
   toggleBannerActive,
   getFlashSales,
   createFlashSale,
+  createFlashSales,
+  updateFlashSale,
   deleteFlashSale,
+  toggleFlashSaleActive,
   getStats,
   getPlatformSettings,
   updateSetting,
   getUserRoles,
+  createAdmin,
+  createAgent,
+  assignAgentStore,
+  updateAgent,
   assignRole,
   getAuditLogs
 };

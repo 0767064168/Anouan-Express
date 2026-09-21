@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/ui/Toast';
-import { messagesAPI } from '../../services/api';
+import { getAssetUrl, messagesAPI } from '../../services/api';
+import { getSocket } from '../../services/socket';
 import Emoji from '../../components/ui/Emoji';
 import PageHeader from '../../components/ui/PageHeader';
 
@@ -117,6 +118,7 @@ export default function ChatPage() {
   const [conversations, setConversations] = useState(DEMO_CONVERSATIONS);
   const [activeConvId, setActiveConvId] = useState(null);
   const [inputText, setInputText] = useState('');
+  const [attachment, setAttachment] = useState(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [showMobileList, setShowMobileList] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
@@ -181,6 +183,33 @@ export default function ChatPage() {
     }
   }, [activeConvId]);
 
+  // Écoute en temps réel des nouveaux messages entrants via Socket.io
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewMessage = (msg) => {
+      if (String(msg.sender_id) === String(activeConvId)) {
+        setDbMessages((prev) => [
+          ...prev,
+          {
+            id: msg.id,
+            sender: 'vendor',
+            text: msg.content,
+            attachmentUrl: getAssetUrl(msg.attachment_url),
+            time: new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: 'read',
+          }
+        ]);
+      }
+    };
+
+    socket.on('new_message', handleNewMessage);
+    return () => {
+      socket.off('new_message', handleNewMessage);
+    };
+  }, [activeConvId]);
+
   const activeConv = conversations.find((c) => c.id === activeConvId) || conversations[0];
   // Messages: si conv DB utilise dbMessages, sinon utilise les messages locaux
   const activeMessages = (!isNaN(activeConvId) && dbMessages.length > 0) ? dbMessages : (activeConv?.messages || []);
@@ -230,7 +259,7 @@ export default function ChatPage() {
 
   const handleSendMessage = async (textToSend) => {
     const msgText = textToSend || inputText;
-    if (!msgText.trim()) return;
+    if (!msgText.trim() && !attachment) return;
 
     const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -238,6 +267,7 @@ export default function ChatPage() {
       id: Date.now(),
       sender: 'client',
       text: msgText.trim(),
+      attachmentUrl: attachment ? URL.createObjectURL(attachment) : null,
       time: currentTime,
       status: 'sent',
     };
@@ -245,7 +275,11 @@ export default function ChatPage() {
     // Si c'est une vraie conv DB, envoyer via API
     if (!isNaN(activeConvId) && activeConvId) {
       try {
-        await messagesAPI.send({ recipient_id: activeConvId, content: msgText.trim() });
+        const payload = new FormData();
+        payload.append('recipientId', activeConvId);
+        payload.append('content', msgText.trim());
+        if (attachment) payload.append('attachment', attachment);
+        await messagesAPI.send(payload);
         setDbMessages(prev => [...prev, newMsg]);
       } catch (err) {
         console.error('Erreur envoi message:', err);
@@ -261,6 +295,7 @@ export default function ChatPage() {
     }
 
     if (!textToSend) setInputText('');
+    setAttachment(null);
 
     // Déclencher l'indicateur d'écriture vendeur après 400ms (mode démo)
     if (isNaN(activeConvId)) {
@@ -443,7 +478,8 @@ export default function ChatPage() {
                           : 'bg-slate-900 border border-slate-800 text-slate-100 font-medium rounded-bl-none'
                       }`}
                     >
-                      {msg.text}
+                      {msg.text && <p>{msg.text}</p>}
+                      {msg.attachmentUrl && <img src={msg.attachmentUrl} alt="Pièce jointe" className="mt-2 max-h-60 max-w-full rounded-xl object-contain" />}
                     </div>
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-400 px-1 font-bold">
                       <span>{msg.time}</span>
@@ -495,11 +531,12 @@ export default function ChatPage() {
               >
                 <button
                   type="button"
-                  onClick={() => toast.info('Envoi de pièces jointes (photos) bientôt disponible.')}
+                  onClick={() => document.getElementById('client-chat-attachment')?.click()}
                   className="p-3 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-2xl border border-slate-800 transition-colors"
                 >
                   <Paperclip size={18} />
                 </button>
+                <input id="client-chat-attachment" type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={(event) => setAttachment(event.target.files?.[0] || null)} />
                 <input
                   type="text"
                   value={inputText}
