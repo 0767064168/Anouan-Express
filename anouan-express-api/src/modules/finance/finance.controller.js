@@ -97,8 +97,62 @@ const exportOrdersCSV = async (req, res, next) => {
       status: req.query.status
     };
     const csvString = await financeService.exportOrdersCSV(filters);
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename=orders_export.csv');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=commandes_anouan.csv');
+    res.send(csvString);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const exportInventoryCSV = async (req, res, next) => {
+  try {
+    const csvString = await financeService.exportInventoryCSV(null);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=inventaire_global_anouan.csv');
+    res.send(csvString);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const exportPayoutsCSV = async (req, res, next) => {
+  try {
+    const filters = {
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    };
+    const csvString = await financeService.exportPayoutsCSV(filters);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=versements_anouan.csv');
+    res.send(csvString);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const exportVendorOrdersCSV = async (req, res, next) => {
+  try {
+    const vendorId = req.user?.vendorId || req.user?.id;
+    const filters = {
+      dateFrom: req.query.dateFrom,
+      dateTo: req.query.dateTo,
+    };
+    const csvString = await financeService.exportVendorOrdersCSV(vendorId, filters);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=mes_commandes_vendeur.csv');
+    res.send(csvString);
+  } catch (err) {
+    next(err);
+  }
+};
+
+const exportVendorInventoryCSV = async (req, res, next) => {
+  try {
+    const vendorId = req.user?.vendorId || req.user?.id;
+    const csvString = await financeService.exportInventoryCSV(vendorId);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=mon_inventaire_stock.csv');
     res.send(csvString);
   } catch (err) {
     next(err);
@@ -114,5 +168,9 @@ module.exports = {
   markPayoutPaid,
   rejectPayout,
   getAdminStats,
-  exportOrdersCSV
+  exportOrdersCSV,
+  exportInventoryCSV,
+  exportPayoutsCSV,
+  exportVendorOrdersCSV,
+  exportVendorInventoryCSV
 };

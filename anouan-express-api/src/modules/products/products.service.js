@@ -383,13 +383,61 @@ const softDelete = async (productId, vendorId, isAdmin = false) => {
   return true;
 };
 
-const updateStock = async (productId, vendorId, delta) => {
-  const { rows } = await query(
-    `UPDATE products SET stock = stock + $1, updated_at = NOW() WHERE id = $2 AND vendor_id = $3 AND (stock + $1) >= 0 RETURNING id, stock`,
-    [delta, productId, vendorId]
-  );
+const updateStock = async (productId, vendorId, delta, explicitStock, isAdmin = false) => {
+  let queryStr;
+  let params;
+
+  if (explicitStock !== undefined && explicitStock !== null) {
+    const num = Math.max(0, parseInt(explicitStock, 10) || 0);
+    if (isAdmin || !vendorId) {
+      queryStr = `
+        UPDATE products 
+        SET stock = $1,
+            status = CASE WHEN $1 = 0 THEN 'out_of_stock' WHEN status = 'out_of_stock' AND $1 > 0 THEN 'active' ELSE status END,
+            updated_at = NOW()
+        WHERE id = $2
+        RETURNING id, title, stock, status, price
+      `;
+      params = [num, productId];
+    } else {
+      queryStr = `
+        UPDATE products 
+        SET stock = $1,
+            status = CASE WHEN $1 = 0 THEN 'out_of_stock' WHEN status = 'out_of_stock' AND $1 > 0 THEN 'active' ELSE status END,
+            updated_at = NOW()
+        WHERE id = $2 AND vendor_id = $3
+        RETURNING id, title, stock, status, price
+      `;
+      params = [num, productId, vendorId];
+    }
+  } else {
+    const d = parseInt(delta, 10) || 0;
+    if (isAdmin || !vendorId) {
+      queryStr = `
+        UPDATE products 
+        SET stock = GREATEST(0, stock + $1),
+            status = CASE WHEN (stock + $1) <= 0 THEN 'out_of_stock' WHEN status = 'out_of_stock' AND (stock + $1) > 0 THEN 'active' ELSE status END,
+            updated_at = NOW()
+        WHERE id = $2 AND (stock + $1) >= 0
+        RETURNING id, title, stock, status, price
+      `;
+      params = [d, productId];
+    } else {
+      queryStr = `
+        UPDATE products 
+        SET stock = GREATEST(0, stock + $1),
+            status = CASE WHEN (stock + $1) <= 0 THEN 'out_of_stock' WHEN status = 'out_of_stock' AND (stock + $1) > 0 THEN 'active' ELSE status END,
+            updated_at = NOW()
+        WHERE id = $2 AND vendor_id = $3 AND (stock + $1) >= 0
+        RETURNING id, title, stock, status, price
+      `;
+      params = [d, productId, vendorId];
+    }
+  }
+
+  const { rows } = await query(queryStr, params);
   if (rows.length === 0) {
-    throw new AppError('Product not found, unauthorized, or insufficient stock', 400);
+    throw new AppError('Produit introuvable, non autorisé ou stock insuffisant', 400);
   }
   return rows[0];
 };

@@ -341,7 +341,30 @@ const getAdminStats = async (filters) => {
   };
 };
 
-const exportOrdersCSV = async (filters) => {
+const toCSV = (rows, defaultHeaders = []) => {
+  const BOM = '\uFEFF';
+  if (!rows || !rows.length) {
+    return BOM + defaultHeaders.join(',') + '\n';
+  }
+
+  const headers = Object.keys(rows[0]).join(',');
+  const lines = rows.map((row) =>
+    Object.values(row)
+      .map((val) => {
+        if (val === null || val === undefined) return '';
+        let str = String(val);
+        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+          str = `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      })
+      .join(',')
+  );
+
+  return BOM + [headers, ...lines].join('\n');
+};
+
+const exportOrdersCSV = async (filters = {}) => {
   let whereStr = '';
   const params = [];
   let paramCount = 1;
@@ -365,26 +388,128 @@ const exportOrdersCSV = async (filters) => {
     ${whereStr}
     ORDER BY o.created_at DESC
   `;
-  
+
   const res = await query(queryStr, params);
-  
-  if (!res.rows.length) {
-    return 'order_id,created_at,status,total_amount,client_name,client_email,vendor_name,product_title,quantity,unit_price\n';
+  return toCSV(res.rows, [
+    'order_id', 'created_at', 'status', 'total_amount',
+    'client_name', 'client_email', 'vendor_name', 'product_title',
+    'quantity', 'unit_price'
+  ]);
+};
+
+const exportInventoryCSV = async (vendorId = null) => {
+  let whereStr = "WHERE p.status != 'deleted'";
+  const params = [];
+
+  if (vendorId) {
+    whereStr += ' AND p.vendor_id = $1';
+    params.push(vendorId);
   }
 
-  const headers = Object.keys(res.rows[0]).join(',');
-  const rows = res.rows.map(row => {
-    return Object.values(row).map(val => {
-      if (val === null || val === undefined) return '';
-      let str = String(val);
-      if (str.includes(',') || str.includes('"')) {
-        str = `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    }).join(',');
-  });
+  const queryStr = `
+    SELECT 
+      p.id as product_id,
+      p.title as product_title,
+      v.shop_name as vendor_name,
+      c.name as category_name,
+      p.price as unit_price,
+      p.stock as current_stock,
+      (p.price * p.stock) as inventory_valuation,
+      p.status as product_status,
+      CASE 
+        WHEN p.stock = 0 THEN 'Rupture de stock'
+        WHEN p.stock <= 5 THEN 'Stock critique'
+        ELSE 'En stock'
+      END as stock_health,
+      p.created_at
+    FROM products p
+    JOIN vendors v ON p.vendor_id = v.id
+    LEFT JOIN categories c ON p.category_id = c.id
+    ${whereStr}
+    ORDER BY p.stock ASC, p.title ASC
+  `;
 
-  return [headers, ...rows].join('\n');
+  const res = await query(queryStr, params);
+  return toCSV(res.rows, [
+    'product_id', 'product_title', 'vendor_name', 'category_name',
+    'unit_price', 'current_stock', 'inventory_valuation', 'product_status',
+    'stock_health', 'created_at'
+  ]);
+};
+
+const exportPayoutsCSV = async (filters = {}) => {
+  let whereStr = '';
+  const params = [];
+  let paramCount = 1;
+
+  if (filters.dateFrom && filters.dateTo) {
+    whereStr += `WHERE vp.created_at BETWEEN $${paramCount++} AND $${paramCount++}`;
+    params.push(filters.dateFrom, filters.dateTo);
+  }
+
+  const queryStr = `
+    SELECT 
+      vp.id as payout_id,
+      v.shop_name as vendor_name,
+      vp.amount as requested_amount,
+      vp.fee as commission_fee,
+      vp.net_amount,
+      vp.payment_method,
+      vp.status as payout_status,
+      vp.notes,
+      vp.created_at,
+      vp.processed_at
+    FROM vendor_payouts vp
+    JOIN vendors v ON vp.vendor_id = v.id
+    ${whereStr}
+    ORDER BY vp.created_at DESC
+  `;
+
+  const res = await query(queryStr, params);
+  return toCSV(res.rows, [
+    'payout_id', 'vendor_name', 'requested_amount', 'commission_fee',
+    'net_amount', 'payment_method', 'payout_status', 'notes',
+    'created_at', 'processed_at'
+  ]);
+};
+
+const exportVendorOrdersCSV = async (vendorId, filters = {}) => {
+  let whereStr = 'WHERE oi.vendor_id = $1';
+  const params = [vendorId];
+  let paramCount = 2;
+
+  if (filters.dateFrom && filters.dateTo) {
+    whereStr += ` AND o.created_at BETWEEN $${paramCount++} AND $${paramCount++}`;
+    params.push(filters.dateFrom, filters.dateTo);
+  }
+
+  const queryStr = `
+    SELECT 
+      o.id as order_id,
+      o.created_at,
+      o.status as order_status,
+      c.name as client_name,
+      c.phone as client_phone,
+      COALESCE(oi.title, p.title) as product_title,
+      oi.quantity,
+      oi.unit_price,
+      (oi.quantity * oi.unit_price) as line_total,
+      o.payment_method,
+      o.payment_status
+    FROM orders o
+    JOIN order_items oi ON o.id = oi.order_id
+    JOIN users c ON o.client_id = c.id
+    LEFT JOIN products p ON oi.product_id = p.id
+    ${whereStr}
+    ORDER BY o.created_at DESC
+  `;
+
+  const res = await query(queryStr, params);
+  return toCSV(res.rows, [
+    'order_id', 'created_at', 'order_status', 'client_name',
+    'client_phone', 'product_title', 'quantity', 'unit_price',
+    'line_total', 'payment_method', 'payment_status'
+  ]);
 };
 
 module.exports = {
@@ -396,5 +521,8 @@ module.exports = {
   markPayoutPaid,
   rejectPayout,
   getAdminStats,
-  exportOrdersCSV
+  exportOrdersCSV,
+  exportInventoryCSV,
+  exportPayoutsCSV,
+  exportVendorOrdersCSV
 };

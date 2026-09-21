@@ -1,7 +1,8 @@
 // src/pages/admin/AdminOrdersPage.jsx — Dark Premium Orange
 import React, { useState, useEffect, useMemo } from 'react';
-import { RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ordersAPI, disputesAPI } from '../../services/api';
+import { RefreshCcw, Eye, ShieldAlert, Loader2, X, Filter, CheckCircle2, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { ordersAPI, disputesAPI, financeAPI } from '../../services/api';
+import { downloadCSVBlob } from '../../utils/exportUtils';
 import DataToolbar from '../../components/ui/DataToolbar';
 import PageHeader from '../../components/ui/PageHeader';
 
@@ -127,6 +128,21 @@ export default function AdminOrdersPage() {
     setPage(1);
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportOrders = async () => {
+    setExporting(true);
+    try {
+      const res = await financeAPI.exportOrders({ status: statusFilter || undefined });
+      downloadCSVBlob(res.data, 'commandes_plateforme_anouan.csv');
+    } catch (err) {
+      console.error('Erreur export commandes admin:', err);
+      alert('Erreur lors du téléchargement de l\'export des commandes.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-slate-100">
       <PageHeader
@@ -135,9 +151,24 @@ export default function AdminOrdersPage() {
         title="Supervision des Commandes"
         subtitle={`${orders.length} commande${orders.length > 1 ? 's' : ''} au total — ${filtered.length} affichée${filtered.length > 1 ? 's' : ''}`}
         actions={(
-          <button onClick={loadOrders} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors">
-            <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportOrders}
+              disabled={exporting || orders.length === 0}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 text-xs font-bold rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
+              title="Exporter les commandes affichées au format CSV / Excel"
+            >
+              {exporting ? (
+                <Loader2 size={14} className="animate-spin text-orange-400" />
+              ) : (
+                <Download size={14} className="text-orange-400" />
+              )}
+              <span>Exporter CSV</span>
+            </button>
+            <button onClick={loadOrders} className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors">
+              <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} /> Actualiser
+            </button>
+          </div>
         )}
       />
 

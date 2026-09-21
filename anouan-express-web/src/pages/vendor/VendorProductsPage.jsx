@@ -1,13 +1,12 @@
-// src/pages/vendor/VendorProductsPage.jsx
-// Gestion des produits du vendeur : liste, ajout, édition, suppression
-
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus, Search, Edit, Trash2, Package, X, Upload, Camera,
-  Loader2, CheckCircle, AlertTriangle, Sparkles, Wand2, Bot, Star, Image as ImageIcon, FileText
+  Plus, Minus, Search, Edit, Trash2, Package, X, Upload, Camera,
+  Loader2, CheckCircle, AlertTriangle, Sparkles, Wand2, Bot, Star, Image as ImageIcon, FileText,
+  Download, ArrowDownToLine
 } from 'lucide-react';
-import { productsAPI, categoriesAPI } from '../../services/api';
+import { productsAPI, categoriesAPI, financeAPI } from '../../services/api';
 import { compressImage } from '../../utils/imageCompressor';
+import { downloadCSVBlob } from '../../utils/exportUtils';
 import PageHeader from '../../components/ui/PageHeader';
 
 const formatPrice = (price) => new Intl.NumberFormat('fr-CI').format(Number(price || 0)) + ' FCFA';
@@ -365,16 +364,105 @@ export default function VendorProductsPage() {
   };
 
   const [filterTab, setFilterTab] = useState('all');
+  const [exporting, setExporting] = useState(false);
+  const [updatingStockId, setUpdatingStockId] = useState(null);
 
   const flashCount = products.filter((p) => Boolean(p.flash_sale_active)).length;
-  const lowStockCount = products.filter((p) => Number(p.stock) <= 5).length;
+  const inStockCount = products.filter((p) => Number(p.stock) > 5).length;
+  const lowStockCount = products.filter((p) => Number(p.stock) > 0 && Number(p.stock) <= 5).length;
+  const outOfStockCount = products.filter((p) => Number(p.stock) === 0).length;
   const inactiveCount = products.filter((p) => p.is_active === false).length;
+
+  const handleAdjustStock = async (product, delta) => {
+    const currentStock = Number(product.stock) || 0;
+    const targetStock = Math.max(0, currentStock + delta);
+    if (targetStock === currentStock && delta < 0) return;
+
+    setUpdatingStockId(product.id);
+    // Optimistic UI update
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id
+          ? {
+              ...p,
+              stock: targetStock,
+              status: targetStock === 0 ? 'out_of_stock' : 'active',
+            }
+          : p
+      )
+    );
+
+    try {
+      await productsAPI.updateStock(product.id, { delta });
+      showToast(`✅ Stock mis à jour : ${targetStock} unité(s)`);
+      window.dispatchEvent(new CustomEvent('anouan_products_updated'));
+    } catch (err) {
+      console.error('Erreur mise à jour stock:', err);
+      showToast(err.response?.data?.message || 'Erreur mise à jour stock.', 'error');
+      await loadData();
+    } finally {
+      setUpdatingStockId(null);
+    }
+  };
+
+  const handleSetExactStock = async (product) => {
+    const current = Number(product.stock) || 0;
+    const val = prompt(`Définir le stock exact pour "${product.title || product.name}" :`, current);
+    if (val === null) return;
+    const num = parseInt(val, 10);
+    if (isNaN(num) || num < 0) {
+      showToast('Valeur de stock invalide.', 'error');
+      return;
+    }
+
+    setUpdatingStockId(product.id);
+    // Optimistic UI update
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === product.id
+          ? {
+              ...p,
+              stock: num,
+              status: num === 0 ? 'out_of_stock' : 'active',
+            }
+          : p
+      )
+    );
+
+    try {
+      await productsAPI.updateStock(product.id, { stock: num });
+      showToast(`✅ Stock défini à ${num} unité(s)`);
+      window.dispatchEvent(new CustomEvent('anouan_products_updated'));
+    } catch (err) {
+      console.error('Erreur définition stock:', err);
+      showToast(err.response?.data?.message || 'Erreur mise à jour stock.', 'error');
+      await loadData();
+    } finally {
+      setUpdatingStockId(null);
+    }
+  };
+
+  const handleExportInventory = async () => {
+    setExporting(true);
+    try {
+      const res = await financeAPI.exportVendorInventory();
+      downloadCSVBlob(res.data, 'mon_inventaire_stock.csv');
+      showToast('✅ Export inventaire CSV/Excel téléchargé !');
+    } catch (err) {
+      console.error('Erreur export inventaire:', err);
+      showToast('Erreur lors du téléchargement de l\'inventaire.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const filtered = products.filter((p) => {
     const matchesSearch = (p.name || p.title || '').toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
+    if (filterTab === 'in_stock') return Number(p.stock) > 5;
+    if (filterTab === 'low_stock') return Number(p.stock) > 0 && Number(p.stock) <= 5;
+    if (filterTab === 'out_of_stock') return Number(p.stock) === 0;
     if (filterTab === 'flash') return Boolean(p.flash_sale_active);
-    if (filterTab === 'low_stock') return Number(p.stock) <= 5;
     if (filterTab === 'inactive') return p.is_active === false;
     return true;
   });
@@ -402,15 +490,31 @@ export default function VendorProductsPage() {
       <PageHeader
         eyebrow="Espace Vendeur"
         eyebrowIcon={Package}
-        title="Mes Produits"
-        subtitle={`${products.length} produit(s) dans votre boutique`}
+        title="Mes Produits & Stocks"
+        subtitle={`${products.length} produit(s) · ${outOfStockCount} en rupture · ${lowStockCount} stock faible`}
         actions={(
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors"
-          >
-            <Plus size={18} /> Ajouter un produit
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExportInventory}
+              disabled={exporting || products.length === 0}
+              className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold px-4 py-2.5 rounded-2xl transition-colors disabled:opacity-50 text-xs shadow-sm"
+              title="Télécharger l'inventaire au format CSV / Excel"
+            >
+              {exporting ? (
+                <Loader2 size={15} className="animate-spin text-orange-400" />
+              ) : (
+                <Download size={15} className="text-orange-400" />
+              )}
+              <span>Exporter Inventaire</span>
+            </button>
+
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 bg-orange-500 text-white font-black px-5 py-2.5 rounded-2xl hover:bg-orange-600 shadow-lg shadow-orange-500/20 transition-colors text-xs"
+            >
+              <Plus size={16} /> Ajouter un produit
+            </button>
+          </div>
         )}
       />
 
@@ -430,25 +534,47 @@ export default function VendorProductsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setFilterTab('flash')}
+            onClick={() => setFilterTab('in_stock')}
             className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              filterTab === 'flash'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+              filterTab === 'in_stock'
+                ? 'bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/30'
                 : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
             }`}
           >
-            ⚡ Ventes Flash <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{flashCount}</span>
+            🟢 En stock <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{inStockCount}</span>
           </button>
           <button
             type="button"
             onClick={() => setFilterTab('low_stock')}
             className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
               filterTab === 'low_stock'
+                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/30'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            🟡 Stock critique <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{lowStockCount}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('out_of_stock')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'out_of_stock'
                 ? 'bg-red-500 text-white shadow-lg shadow-red-500/30'
                 : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
             }`}
           >
-            ⚠️ Stock Faible <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{lowStockCount}</span>
+            🔴 Ruptures <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{outOfStockCount}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('flash')}
+            className={`px-3.5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              filterTab === 'flash'
+                ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                : 'bg-slate-900 border border-slate-800 text-slate-300 hover:border-slate-700'
+            }`}
+          >
+            ⚡ Flash <span className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded-full">{flashCount}</span>
           </button>
           <button
             type="button"
@@ -554,8 +680,60 @@ export default function VendorProductsPage() {
                     </div>
                   )}
                 </div>
-                <div className="text-xs text-slate-400 mb-4">
-                  Stock : <span className="font-black text-white">{product.stock ?? '—'}</span>
+                {/* Contrôleur de Stock Rapide & Santé du Stock */}
+                <div className="mb-4 bg-slate-950/80 border border-slate-800/80 rounded-2xl p-2.5 space-y-2">
+                  <div className="flex items-center justify-between gap-1 text-[11px]">
+                    <span className="text-slate-400 font-bold">État Stock :</span>
+                    {Number(product.stock) === 0 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-500/15 text-red-400 border border-red-500/30 animate-pulse">
+                        🔴 Rupture
+                      </span>
+                    ) : Number(product.stock) <= 5 ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                        🟡 Critique ({product.stock})
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        🟢 En stock ({product.stock})
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Boutons d'ajustement direct rapide */}
+                  <div className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1">
+                    <button
+                      type="button"
+                      disabled={updatingStockId === product.id || Number(product.stock) <= 0}
+                      onClick={(e) => { e.stopPropagation(); handleAdjustStock(product, -1); }}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-300 font-black flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                      title="Diminuer le stock de 1"
+                    >
+                      <Minus size={13} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleSetExactStock(product); }}
+                      title="Cliquer pour définir manuellement le stock exact"
+                      className="text-xs font-black text-white hover:text-orange-400 underline decoration-dotted underline-offset-2 transition-colors px-1"
+                    >
+                      {updatingStockId === product.id ? (
+                        <Loader2 size={13} className="animate-spin text-orange-400 inline" />
+                      ) : (
+                        <span>{product.stock ?? 0} unités</span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={updatingStockId === product.id}
+                      onClick={(e) => { e.stopPropagation(); handleAdjustStock(product, 1); }}
+                      className="w-7 h-7 rounded-lg bg-slate-800 hover:bg-emerald-500/20 hover:text-emerald-400 text-slate-300 font-black flex items-center justify-center transition-colors disabled:opacity-30 active:scale-95"
+                      title="Augmenter le stock de 1"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Actions */}

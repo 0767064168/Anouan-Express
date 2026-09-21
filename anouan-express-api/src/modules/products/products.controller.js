@@ -160,6 +160,19 @@ const bulkImportCSV = async (req, res, next) => {
   }
 };
 
+const adjustStock = async (req, res, next) => {
+  try {
+    const isAdmin = req.user?.role === 'admin';
+    const vendorId = req.user?.vendorId || req.user?.id;
+    const { delta, stock } = req.body;
+
+    const result = await productsService.updateStock(req.params.id, vendorId, delta, stock, isAdmin);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getCatalog,
   getById,
@@ -170,5 +183,6 @@ module.exports = {
   create,
   update,
   softDelete,
+  adjustStock,
   bulkImportCSV
 };

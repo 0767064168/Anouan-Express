@@ -2,8 +2,9 @@
 // Commandes reçues par le vendeur + mise à jour du statut + Impression Bordereau A4 avec QR Code
 
 import React, { useState, useEffect } from 'react';
-import { Filter, Eye, X, Package, Printer } from 'lucide-react';
-import { ordersAPI } from '../../services/api';
+import { Filter, Eye, X, Package, Printer, Download, Loader2 } from 'lucide-react';
+import { ordersAPI, financeAPI } from '../../services/api';
+import { downloadCSVBlob } from '../../utils/exportUtils';
 import DeliverySlipModal from '../../components/vendor/DeliverySlipModal';
 import DataToolbar from '../../components/ui/DataToolbar';
 import PageHeader from '../../components/ui/PageHeader';
@@ -101,6 +102,21 @@ export default function VendorOrdersPage() {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportOrders = async () => {
+    setExporting(true);
+    try {
+      const res = await financeAPI.exportVendorOrders();
+      downloadCSVBlob(res.data, 'mes_commandes_vendeur.csv');
+    } catch (err) {
+      console.error('Erreur export commandes:', err);
+      alert('Erreur lors du téléchargement de l\'export des commandes.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const filtered = orders.filter((o) => {
     const matchesSearch = String(o.id).includes(search) || (o.client_name || '').toLowerCase().includes(search.toLowerCase());
     const matchesStatus = !filterStatus || o.status === filterStatus;
@@ -114,6 +130,21 @@ export default function VendorOrdersPage() {
         eyebrowIcon={Package}
         title="Commandes reçues"
         subtitle={`${orders.length} commande(s) à traiter`}
+        actions={(
+          <button
+            onClick={handleExportOrders}
+            disabled={exporting || orders.length === 0}
+            className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold px-4 py-2.5 rounded-2xl transition-colors disabled:opacity-50 text-xs shadow-sm"
+            title="Télécharger l'historique de vos commandes au format CSV / Excel"
+          >
+            {exporting ? (
+              <Loader2 size={15} className="animate-spin text-orange-400" />
+            ) : (
+              <Download size={15} className="text-orange-400" />
+            )}
+            <span>Exporter Commandes (CSV)</span>
+          </button>
+        )}
       />
 
       <DataToolbar

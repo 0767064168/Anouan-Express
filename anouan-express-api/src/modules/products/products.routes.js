@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const productsController = require('./products.controller');
-const { createSchema, updateSchema, catalogQuerySchema } = require('./products.validation');
+const { createSchema, updateSchema, catalogQuerySchema, adjustStockSchema } = require('./products.validation');
 const { authenticate, authenticateOptional } = require('../../middlewares/authenticate');
 const { authorize } = require('../../middlewares/authorize');
 const { validate } = require('../../middlewares/validate');
@@ -19,6 +19,7 @@ router.get('/:id', productsController.getById);
 router.get('/vendor/me', authenticate, authorize('vendor', 'admin'), productsController.getVendorProducts);
 router.post('/', authenticate, authorize('vendor', 'admin'), uploadProductImages, optimizeUploadedImage, validate({ body: createSchema }), productsController.create);
 router.put('/:id', authenticate, authorize('vendor', 'admin'), uploadProductImages, optimizeUploadedImage, validate({ body: updateSchema }), productsController.update);
+router.patch('/:id/stock', authenticate, authorize('vendor', 'admin'), validate({ body: adjustStockSchema }), productsController.adjustStock);
 router.delete('/:id', authenticate, authorize('vendor', 'admin'), productsController.softDelete);
 router.post('/bulk-import', authenticate, authorize('vendor', 'admin'), productsController.bulkImportCSV);
 

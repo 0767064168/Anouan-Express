@@ -4,9 +4,10 @@ import {
   DollarSign, TrendingUp, ArrowUpRight, ArrowDownRight, Loader2,
   CheckCircle, Clock, RefreshCcw, Check, X, Send, AlertTriangle,
   Store, Wallet, Package, ShieldCheck, Receipt, Printer, MapPin, Phone, Eye,
-  Users, BadgeDollarSign, Banknote, ArchiveX, Lock
+  Users, BadgeDollarSign, Banknote, ArchiveX, Lock, Download
 } from 'lucide-react';
 import { financeAPI } from '../../services/api';
+import { downloadCSVBlob } from '../../utils/exportUtils';
 import { PaymentLogo } from '../../components/ui/PaymentLogos';
 import PageHeader from '../../components/ui/PageHeader';
 
@@ -218,6 +219,35 @@ export default function AdminFinancePage() {
     { id: 'agents',     label: 'Point des Agents',      icon: Users },
   ];
 
+  const [exportingPayouts, setExportingPayouts] = useState(false);
+  const [exportingInventory, setExportingInventory] = useState(false);
+
+  const handleExportPayouts = async () => {
+    setExportingPayouts(true);
+    try {
+      const res = await financeAPI.exportPayouts();
+      downloadCSVBlob(res.data, 'versements_vendeurs_anouan.csv');
+    } catch (err) {
+      console.error('Erreur export versements:', err);
+      alert('Erreur lors du téléchargement des versements.');
+    } finally {
+      setExportingPayouts(false);
+    }
+  };
+
+  const handleExportInventory = async () => {
+    setExportingInventory(true);
+    try {
+      const res = await financeAPI.exportInventory();
+      downloadCSVBlob(res.data, 'inventaire_global_anouan.csv');
+    } catch (err) {
+      console.error('Erreur export inventaire global:', err);
+      alert('Erreur lors du téléchargement de l\'inventaire global.');
+    } finally {
+      setExportingInventory(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-slate-100">
       {/* Toast confirmation */}
@@ -248,12 +278,42 @@ export default function AdminFinancePage() {
         title="Finance & Reversements"
         subtitle="Supervision des flux financiers, paiements vendeurs et points de caisse agents."
         actions={(
-          <button
-            onClick={loadData}
-            className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors"
-          >
-            <RefreshCcw size={14} /> Actualiser
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleExportPayouts}
+              disabled={exportingPayouts}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 text-xs font-bold rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
+              title="Exporter l'historique des versements (CSV / Excel)"
+            >
+              {exportingPayouts ? (
+                <Loader2 size={14} className="animate-spin text-orange-400" />
+              ) : (
+                <Download size={14} className="text-orange-400" />
+              )}
+              <span>Export Versements</span>
+            </button>
+
+            <button
+              onClick={handleExportInventory}
+              disabled={exportingInventory}
+              className="flex items-center gap-2 px-3.5 py-2.5 bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 text-xs font-bold rounded-2xl transition-colors disabled:opacity-50 shadow-sm"
+              title="Exporter l'inventaire global et la valorisation du stock (CSV / Excel)"
+            >
+              {exportingInventory ? (
+                <Loader2 size={14} className="animate-spin text-orange-400" />
+              ) : (
+                <Download size={14} className="text-orange-400" />
+              )}
+              <span>Export Inventaire</span>
+            </button>
+
+            <button
+              onClick={loadData}
+              className="flex items-center gap-2 px-4 py-2.5 bg-orange-500/15 border border-orange-500/30 text-orange-400 text-xs font-bold rounded-2xl hover:bg-orange-500/25 transition-colors"
+            >
+              <RefreshCcw size={14} /> Actualiser
+            </button>
+          </div>
         )}
       />
 

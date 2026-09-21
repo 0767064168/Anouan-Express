@@ -142,6 +142,7 @@ export const productsAPI = {
     api.post('/products', formData, formData instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
   update: (id, formData) =>
     api.put(`/products/${id}`, formData, formData instanceof FormData ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined),
+  updateStock: (id, data) => api.patch(`/products/${id}/stock`, data),
   delete: (id) => api.delete(`/products/${id}`),
 };
 
@@ -210,7 +211,11 @@ export const financeAPI = {
   getVendorPayouts: (params) => api.get('/finance/vendor/payouts', { params }),
   getAdminStats: (params) => api.get('/finance/admin/stats', { params }),
   getAllPayouts: (params) => api.get('/finance/admin/payouts', { params }),
-  exportOrders: (params) => api.get('/finance/admin/export', { params, responseType: 'blob' }),
+  exportOrders: (params) => api.get('/finance/admin/export/orders', { params, responseType: 'blob' }),
+  exportInventory: (params) => api.get('/finance/admin/export/inventory', { params, responseType: 'blob' }),
+  exportPayouts: (params) => api.get('/finance/admin/export/payouts', { params, responseType: 'blob' }),
+  exportVendorOrders: (params) => api.get('/finance/vendor/export/orders', { params, responseType: 'blob' }),
+  exportVendorInventory: (params) => api.get('/finance/vendor/export/inventory', { params, responseType: 'blob' }),
   createPayout: (data) => api.post('/finance/admin/payouts', data),
   markPayoutPaid: (id, data) => api.put(`/finance/admin/payouts/${id}/paid`, data),
   rejectPayout: (id, data) => api.put(`/finance/admin/payouts/${id}/rejected`, data),

@@ -13,6 +13,7 @@ import {
   Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { adminAPI, financeAPI, ordersAPI } from '../../services/api';
+import { downloadCSVBlob } from '../../utils/exportUtils';
 import { useToast } from '../../components/ui/Toast';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
@@ -199,18 +200,31 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleExport = async () => {
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportOrders = async () => {
+    setExporting(true);
     try {
       const response = await financeAPI.exportOrders();
-      const url = URL.createObjectURL(response.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'anouan-express-commandes.csv';
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadCSVBlob(response.data, 'anouan-commandes.csv');
       toast.success('Export des commandes téléchargé.');
     } catch (err) {
       toast.error('Impossible de générer l’export des commandes.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportInventory = async () => {
+    setExporting(true);
+    try {
+      const response = await financeAPI.exportInventory();
+      downloadCSVBlob(response.data, 'anouan-inventaire-global.csv');
+      toast.success('Export inventaire global téléchargé.');
+    } catch (err) {
+      toast.error('Impossible de générer l’export inventaire.');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -308,10 +322,20 @@ export default function AdminDashboardPage() {
               <Users size={15} className="text-orange-400" /> Gestion Utilisateurs
             </Link>
             <button
-              onClick={handleExport}
-              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition-all"
+              onClick={handleExportOrders}
+              disabled={exporting}
+              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all disabled:opacity-50"
+              title="Exporter les commandes de la plateforme au format CSV / Excel"
             >
-              <Download size={15} className="text-orange-400" /> Exporter CSV
+              <Download size={14} className="text-orange-400" /> Export Commandes
+            </button>
+            <button
+              onClick={handleExportInventory}
+              disabled={exporting}
+              className="flex items-center gap-2 bg-slate-900 border border-slate-800 hover:border-orange-500/40 text-slate-300 hover:text-white px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all disabled:opacity-50"
+              title="Exporter l'inventaire global et valorisation des stocks (CSV / Excel)"
+            >
+              <PackageCheck size={14} className="text-orange-400" /> Export Inventaire
             </button>
           </>
         }

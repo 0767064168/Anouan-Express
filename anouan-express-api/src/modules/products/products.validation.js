@@ -52,8 +52,14 @@ const catalogQuerySchema = Joi.object({
   sort: Joi.string().allow('', null)
 }).unknown(true);
 
+const adjustStockSchema = Joi.object({
+  delta: Joi.number().integer(),
+  stock: Joi.number().integer().min(0),
+}).or('delta', 'stock');
+
 module.exports = {
   createSchema,
   updateSchema,
-  catalogQuerySchema
+  catalogQuerySchema,
+  adjustStockSchema
 };

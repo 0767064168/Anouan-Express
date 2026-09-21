@@ -12,6 +12,8 @@ router.get('/vendor/stats', authenticate, authorize('vendor'), validate({ query:
 router.get('/vendor/payouts', authenticate, authorize('vendor'), financeController.getVendorPayouts);
 router.get('/vendor/history', authenticate, authorize('vendor'), financeController.getVendorPayouts);
 router.post('/vendor/payout', authenticate, authorize('vendor'), validate({ body: requestVendorPayoutSchema }), financeController.requestVendorPayout);
+router.get('/vendor/export/orders', authenticate, authorize('vendor'), validate({ query: dateRangeSchema }), financeController.exportVendorOrdersCSV);
+router.get('/vendor/export/inventory', authenticate, authorize('vendor'), financeController.exportVendorInventoryCSV);
 
 // Admin routes
 router.get('/admin/stats', authenticate, authorize('admin'), validate({ query: dateRangeSchema }), financeController.getAdminStats);
@@ -20,5 +22,8 @@ router.post('/admin/payouts', authenticate, authorize('admin'), validate({ body:
 router.put('/admin/payouts/:id/paid', authenticate, authorize('admin'), validate({ params: payoutIdParamSchema }), validate({ body: paymentRefSchema }), financeController.markPayoutPaid);
 router.put('/admin/payouts/:id/rejected', authenticate, authorize('admin'), validate({ params: payoutIdParamSchema }), validate({ body: rejectPayoutSchema }), financeController.rejectPayout);
 router.get('/admin/export', authenticate, authorize('admin'), validate({ query: dateRangeSchema }), financeController.exportOrdersCSV);
+router.get('/admin/export/orders', authenticate, authorize('admin'), validate({ query: dateRangeSchema }), financeController.exportOrdersCSV);
+router.get('/admin/export/inventory', authenticate, authorize('admin'), financeController.exportInventoryCSV);
+router.get('/admin/export/payouts', authenticate, authorize('admin'), validate({ query: dateRangeSchema }), financeController.exportPayoutsCSV);
 
 module.exports = router;
