@@ -172,7 +172,17 @@ const MOCK_PRODUCTS_MAP = {
     // Filtrer les entrées dupliquées
     productImages = Array.from(new Set(productImages)).filter(Boolean);
 
-    setProduct(targetProduct);
+    const salePrice = Number(targetProduct.sale_price || targetProduct.discount_price || (targetProduct.flash_sale_active && targetProduct.flash_sale_price) || 0);
+    if (salePrice > 0 && salePrice < Number(targetProduct.price || 0)) {
+      targetProduct = {
+        ...targetProduct,
+        old_price: targetProduct.price,
+        price: salePrice,
+        flash_sale_active: true,
+        flash_sale_price: salePrice,
+      };
+      setProduct(targetProduct);
+    }
     setGallery(productImages);
     setActiveImage(0);
     addRecentlyViewed(targetProduct);

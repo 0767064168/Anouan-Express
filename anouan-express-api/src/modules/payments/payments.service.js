@@ -8,6 +8,33 @@ const { pushOrderCreated } = require('../../utils/pushNotification');
 const crypto = require('crypto');
 
 class PaymentsService {
+  validateWebhookSignature(payload, headers = {}, rawBody = '') {
+    const envName = env.app?.env || 'development';
+    const secret = env.payment?.webhookSecret || env.payment?.cinetpay?.apiKey;
+
+    if (envName !== 'production' || !secret) return true;
+
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody || JSON.stringify(payload || {}))
+      .digest('hex');
+
+    const receivedSignature = headers['x-cinetpay-signature'] || headers['X-CinetPay-Signature'] || headers['x-signature'] || headers['X-Signature'];
+
+    if (!receivedSignature) {
+      throw new AppError('Signature du webhook invalide.', 401, 'WEBHOOK_SIGNATURE_INVALID');
+    }
+
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    const receivedBuffer = Buffer.from(receivedSignature, 'hex');
+
+    if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      throw new AppError('Signature du webhook invalide.', 401, 'WEBHOOK_SIGNATURE_INVALID');
+    }
+
+    return true;
+  }
+
   async verifyCinetPayPayment(transactionId) {
     if (!env.payment.cinetpay.apiKey || !env.payment.cinetpay.siteId) return null;
 
@@ -101,11 +128,17 @@ class PaymentsService {
     };
   }
 
-  async handleWebhook(payload) {
+  async handleWebhook(payload, headers = {}, rawBody = '') {
     const transactionId = payload.cpm_trans_id || payload.paymentId || payload.transaction_id;
     let paymentStatus = (payload.cpm_result === '00' || payload.status === 'success' || payload.status === 'paid') ? 'success' : 'failed';
-    
+
     if (!transactionId) return { received: true, status: 'ignored' };
+
+    try {
+      this.validateWebhookSignature(payload, headers, rawBody);
+    } catch (error) {
+      throw error;
+    }
 
     if (env.payment.cinetpay.apiKey && env.payment.cinetpay.siteId) {
       try {
@@ -114,7 +147,7 @@ class PaymentsService {
         throw new AppError(`Vérification CinetPay impossible : ${error.message}`, 502, 'PAYMENT_VERIFICATION_ERROR');
       }
     }
-    
+
     try {
       const { rows: paymentRows } = await query('SELECT * FROM payments WHERE id::text = $1 OR reference = $1', [transactionId]);
       if (paymentRows.length) {
@@ -144,12 +177,9 @@ class PaymentsService {
             }
           }
 
-          // Récupérer le client_id de la commande
           const { rows: orderRows } = await query('SELECT client_id, total_amount FROM orders WHERE id = $1', [payment.order_id]);
           if (orderRows.length) {
             const clientUserId = orderRows[0].client_id;
-            
-            // Notification en base
             await query(`
               INSERT INTO notifications (user_id, type, title, body, metadata)
               VALUES ($1, 'payment_confirmed', $2, $3, $4)
@@ -160,7 +190,6 @@ class PaymentsService {
               JSON.stringify({ orderId: payment.order_id, amount: payment.amount })
             ]);
 
-            // Notification en direct via Socket.io
             try {
               const { emitToUser, emitToOrder } = require('../../config/socket');
               const notifData = {
@@ -173,7 +202,6 @@ class PaymentsService {
               emitToOrder(payment.order_id, 'payment_confirmed', notifData);
             } catch (sockErr) {}
 
-            // Push FCM sur confirmation de paiement
             try {
               const { sendPushNotification } = require('../../config/firebase');
               const { rows: clientRows } = await query('SELECT fcm_token FROM users WHERE id = $1', [clientUserId]);
@@ -195,7 +223,7 @@ class PaymentsService {
     } catch (e) {
       console.error('[WEBHOOK ERROR]', e);
     }
-    
+
     return { received: true, status: paymentStatus, transactionId };
   }
 

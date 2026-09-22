@@ -1,13 +1,13 @@
 // src/pages/agent/PickupAgentPage.jsx — Dark Premium Orange
 // Espace Agent Guichet Magasin Central Bouaké
 // Dashboard complet : Retraits, Encaissements Espèces, Colis en attente, Historique des remis, Synthèse par client & Reçu de caisse
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   ShieldCheck, Search, CheckCircle2, AlertCircle, RefreshCw,
   PackageCheck, LogOut, ArrowLeft, Package, User, Phone,
   Camera, Check, Store, QrCode, Clock, Sparkles, KeyRound,
   Smartphone, FileCheck, DollarSign, Wallet, ArrowUpRight,
-  TrendingUp, Users, Receipt, CreditCard, ChevronRight, Eye, Printer, X, Truck
+  TrendingUp, Users, Receipt, CreditCard, ChevronRight, Eye, Printer, X, Truck, MapPin
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { pickupAPI, ordersAPI } from '../../services/api';
@@ -20,105 +20,12 @@ import QrScannerModal from '../../components/agent/QrScannerModal';
 const formatPrice = (p) => new Intl.NumberFormat('fr-CI').format(Number(p || 0)) + ' FCFA';
 const cleanPhone = (str) => (str || '').replace(/\D/g, '');
 
-const INITIAL_WAITING_ORDERS = [
-  {
-    orderId: 'CMD-847291',
-    code: '7K4D9XQP',
-    clientName: 'Kouadio Jean-Marc',
-    clientPhone: '+225 07 45 12 88',
-    status: 'ready_for_pickup',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 32000,
-    paymentMethod: 'cash',
-    paymentStatus: 'pending_payment',
-    items: [
-      { name: 'Pagne Baoulé Tissé Main', qty: 1, price: 25000, vendor: 'Maison du Pagne Bouaké' },
-      { name: 'Sandales en Cuir Artisanales', qty: 1, price: 7000, vendor: 'Cuir & Style Bouaké' }
-    ],
-    arrivalDate: 'Aujourd\'hui 09:30',
-  },
-  {
-    orderId: 'CMD-8492',
-    code: '8A4F92B1',
-    clientName: 'Awa Sylla',
-    clientPhone: '+225 07 89 12 34',
-    status: 'ready_for_pickup',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 250000,
-    paymentMethod: 'orange',
-    paymentStatus: 'paid',
-    items: [
-      { name: 'Smartphone Pro Max 5G Ultra', qty: 1, price: 250000, vendor: 'Tech Store CI' },
-    ],
-    arrivalDate: 'Hier 16:45',
-  },
-  {
-    orderId: 'CMD-846995',
-    code: '3M9P5W2Z',
-    clientName: 'Mariam Koffi',
-    clientPhone: '+225 05 66 77 88',
-    status: 'ready_for_pickup',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 18500,
-    paymentMethod: 'cash',
-    paymentStatus: 'pending_payment',
-    items: [
-      { name: 'Écouteurs Sans Fil Pro HD', qty: 1, price: 10000, vendor: 'Tech Store CI' },
-      { name: 'Robe d\'été fleurie WAX', qty: 1, price: 8500, vendor: 'Fashion Mode' }
-    ],
-    arrivalDate: 'Hier 11:20',
-  },
-  {
-    orderId: 'CMD-846102',
-    code: '9W2X4L1Q',
-    clientName: 'Kouadio Jean-Marc',
-    clientPhone: '+225 07 45 12 88',
-    status: 'ready_for_pickup',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 15000,
-    paymentMethod: 'wave',
-    paymentStatus: 'paid',
-    items: [
-      { name: 'Chaussures Ville Cuir Noir', qty: 1, price: 15000, vendor: 'Chaussures & Co' }
-    ],
-    arrivalDate: '05/09/2026',
-  },
-];
+// Les données sont chargées depuis l'API (filtrées par store de l'agent côté serveur)
+const INITIAL_WAITING_ORDERS = [];
+const INITIAL_PICKED_UP_ORDERS = [];
 
-const INITIAL_PICKED_UP_ORDERS = [
-  {
-    orderId: 'CMD-845890',
-    code: '4K9L2V8M',
-    clientName: 'Bamba Souleymane',
-    clientPhone: '+225 01 22 33 44',
-    status: 'picked_up',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 45000,
-    paymentMethod: 'cash',
-    paymentStatus: 'paid',
-    items: [
-      { name: 'Montre Connectée Sport HD', qty: 2, price: 22500, vendor: 'Tech Store CI' }
-    ],
-    pickedUpAt: 'Aujourd\'hui 11:15',
-    agentName: 'Agent Relais 01',
-  },
-  {
-    orderId: 'CMD-845712',
-    code: '1N8J3C5T',
-    clientName: 'Awa Sylla',
-    clientPhone: '+225 07 89 12 34',
-    status: 'picked_up',
-    store: 'Magasin Central Bouaké',
-    totalAmount: 28000,
-    paymentMethod: 'orange',
-    paymentStatus: 'paid',
-    items: [
-      { name: 'Pagne Kita Royal 3 Pièces', qty: 1, price: 28000, vendor: 'Maison du Pagne Bouaké' }
-    ],
-    pickedUpAt: 'Hier 17:40',
-    agentName: 'Agent Relais 01',
-  },
-];
+
+
 
 export default function PickupAgentPage() {
   const { user, logout } = useAuth();
@@ -149,52 +56,76 @@ export default function PickupAgentPage() {
   // État persistant des colis
   const [waitingOrders, setWaitingOrders] = useState(INITIAL_WAITING_ORDERS);
   const [pickedUpOrders, setPickedUpOrders] = useState(INITIAL_PICKED_UP_ORDERS);
+  const [agentStats, setAgentStats] = useState(null);
+  const [loadingOrders, setLoadingOrders] = useState(false);
 
-  const loadOrdersFromDB = async () => {
+  const storeName = user?.store_name || user?.store_city || null;
+
+  const loadOrdersFromDB = useCallback(async (silent = false) => {
+    if (!silent) setLoadingOrders(true);
     try {
-      const res = await ordersAPI.getAll({ limit: 100 });
-      const orders = res.data?.data || res.data || [];
-      if (Array.isArray(orders) && orders.length > 0) {
-        const waiting = orders.filter(o => o.status !== 'picked_up' && o.status !== 'cancelled').map(o => ({
-          id: o.id,
-          orderId: o.id,
-          code: o.pickup_code || '8A4F92B1',
-          clientName: o.client_name || 'Client Anouan',
-          clientPhone: o.client_phone || '',
-          totalAmount: Number(o.total_amount || 0),
-          paymentMethod: o.payment_method || 'cash',
-          paymentStatus: o.payment_status || (o.payment_method === 'cash' ? 'pending' : 'paid'),
-          items: o.items || [],
-          status: o.status || 'ready_for_pickup',
-          arrivedAt: o.created_at,
-        }));
-        const history = orders.filter(o => o.status === 'picked_up').map(o => ({
-          id: o.id,
-          orderId: o.id,
-          code: o.pickup_code || '8A4F92B1',
-          clientName: o.client_name || 'Client Anouan',
-          clientPhone: o.client_phone || '',
-          totalAmount: Number(o.total_amount || 0),
-          paymentMethod: o.payment_method || 'cash',
-          paymentStatus: 'paid',
-          items: o.items || [],
-          status: 'picked_up',
-          pickedUpAt: o.updated_at,
-        }));
-        setWaitingOrders(waiting);
-        setPickedUpOrders(history);
+      const [res, statsRes] = await Promise.allSettled([
+        ordersAPI.getAll({ limit: 200 }),
+        ordersAPI.getAgentStats(),
+      ]);
+
+      // Chargement des commandes
+      if (res.status === 'fulfilled') {
+        const orders = res.value.data?.data || res.value.data || [];
+        if (Array.isArray(orders)) {
+          const waiting = orders.filter(o => o.status !== 'picked_up' && o.status !== 'cancelled').map(o => ({
+            id: o.id,
+            orderId: o.id,
+            code: o.pickup_code || '',
+            clientName: o.client_name || 'Client Anouan',
+            clientPhone: o.client_phone || '',
+            totalAmount: Number(o.total_amount || 0),
+            paymentMethod: o.payment_method || 'cash',
+            paymentStatus: o.payment_status || (o.payment_method === 'cash' ? 'pending' : 'paid'),
+            items: o.items || [],
+            status: o.status || 'ready_for_pickup',
+            arrivedAt: o.created_at,
+          }));
+          const history = orders.filter(o => o.status === 'picked_up').map(o => ({
+            id: o.id,
+            orderId: o.id,
+            code: o.pickup_code || '',
+            clientName: o.client_name || 'Client Anouan',
+            clientPhone: o.client_phone || '',
+            totalAmount: Number(o.total_amount || 0),
+            paymentMethod: o.payment_method || 'cash',
+            paymentStatus: 'paid',
+            items: o.items || [],
+            status: 'picked_up',
+            pickedUpAt: o.updated_at,
+          }));
+          setWaitingOrders(waiting);
+          setPickedUpOrders(history);
+        }
+      }
+
+      // Chargement des stats agent
+      if (statsRes.status === 'fulfilled') {
+        setAgentStats(statsRes.value.data?.data || null);
       }
     } catch (e) {
       console.error('Erreur chargement colis agent:', e);
+    } finally {
+      setLoadingOrders(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadOrdersFromDB();
-    const handleSync = () => loadOrdersFromDB();
+    const handleSync = () => loadOrdersFromDB(true);
     window.addEventListener('anouan_order_status_updated', handleSync);
-    return () => window.removeEventListener('anouan_order_status_updated', handleSync);
-  }, []);
+    // Auto-refresh toutes les 60 secondes
+    const interval = setInterval(() => loadOrdersFromDB(true), 60000);
+    return () => {
+      window.removeEventListener('anouan_order_status_updated', handleSync);
+      clearInterval(interval);
+    };
+  }, [loadOrdersFromDB]);
 
   // ─── Indicateurs financiers & statistiques calculées ───
   const stats = useMemo(() => {
@@ -485,8 +416,10 @@ export default function PickupAgentPage() {
                 <DollarSign size={16} />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-white">{formatPrice(stats.cashCollected)}</p>
-            <p className="text-[10px] text-slate-400 mt-1">Encaissés au guichet</p>
+            <p className="text-xl sm:text-2xl font-black text-white">
+              {agentStats ? formatPrice(agentStats.cash_collected_today) : formatPrice(stats.cashCollected)}
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">Encaissés aujourd'hui</p>
           </div>
 
           {/* Reste à encaisser en espèces */}
@@ -497,11 +430,13 @@ export default function PickupAgentPage() {
                 <Wallet size={16} />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-amber-400">{formatPrice(stats.cashToCollect)}</p>
+            <p className="text-xl sm:text-2xl font-black text-amber-400">
+              {agentStats ? formatPrice(agentStats.cash_to_collect) : formatPrice(stats.cashToCollect)}
+            </p>
             <p className="text-[10px] text-slate-400 mt-1">Sur colis en attente</p>
           </div>
 
-          {/* Colis en attente */}
+          {/* Colis en attente prêts + en transit */}
           <div className="bg-gradient-to-br from-orange-500/15 via-slate-900 to-slate-900 border border-orange-500/25 rounded-3xl p-4 relative overflow-hidden shadow-lg">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wider">Colis en Attente</span>
@@ -509,20 +444,28 @@ export default function PickupAgentPage() {
                 <Package size={16} />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-white">{stats.countWaiting} colis</p>
-            <p className="text-[10px] text-slate-400 mt-1">Prêts pour remise</p>
+            <p className="text-xl sm:text-2xl font-black text-white">
+              {agentStats ? parseInt(agentStats.ready_orders || 0) : stats.countWaiting} colis
+            </p>
+            <p className="text-[10px] text-slate-400 mt-1">
+              {agentStats ? `+${parseInt(agentStats.in_transit_orders || 0)} en transit` : 'Prêts pour remise'}
+            </p>
           </div>
 
-          {/* Colis délivrés / Clients passés */}
+          {/* Colis délivrés aujourd'hui */}
           <div className="bg-gradient-to-br from-purple-500/15 via-slate-900 to-slate-900 border border-purple-500/25 rounded-3xl p-4 relative overflow-hidden shadow-lg">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">Clients Servis</span>
+              <span className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">Remis Aujourd'hui</span>
               <div className="p-2 rounded-xl bg-purple-500/20 text-purple-400 border border-purple-500/30">
                 <Users size={16} />
               </div>
             </div>
-            <p className="text-xl sm:text-2xl font-black text-white">{stats.countPickedUp} délivrés</p>
-            <p className="text-[10px] text-purple-300 font-bold mt-1">Vol: {formatPrice(stats.totalDeliveredValue)}</p>
+            <p className="text-xl sm:text-2xl font-black text-white">
+              {agentStats ? parseInt(agentStats.picked_up_today || 0) : stats.countPickedUp} remis
+            </p>
+            <p className="text-[10px] text-purple-300 font-bold mt-1">
+              Total: {agentStats ? parseInt(agentStats.picked_up_orders || 0) : stats.countPickedUp}
+            </p>
           </div>
         </div>
 

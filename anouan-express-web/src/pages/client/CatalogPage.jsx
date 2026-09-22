@@ -207,11 +207,13 @@ export default function CatalogPage() {
             ...p,
             name: title,
             title: title,
-            price: Number(p.price || 0),
+            price: Number(p.sale_price || p.discount_price || (p.flash_sale_active && p.flash_sale_price) || p.price || 0),
             image: resolvedImg,
             image_url: resolvedImg,
             rating: Number(p.rating || p.avg_rating || 4.8),
-            oldPrice: p.oldPrice || p.old_price || null,
+            oldPrice: Number(p.oldPrice || p.old_price || ((p.sale_price || p.discount_price || (p.flash_sale_active && p.flash_sale_price)) ? p.price : 0)) || null,
+            flash_sale_active: !!(p.flash_sale_active || p.sale_price || p.discount_price),
+            flash_sale_price: Number(p.sale_price || p.discount_price || p.flash_sale_price || 0) || null,
           };
         });
       } else {

@@ -167,6 +167,7 @@ export default function VendorProductsPage() {
 
   const openCreate = () => {
     resetForm();
+    setCoverIndex(0);
     setModalOpen(true);
   };
 
@@ -174,11 +175,13 @@ export default function VendorProductsPage() {
     resetForm();
     setEditProduct(p);
     const existingImgs = getImageCache(p.id);
-    const initialImages = (Array.isArray(p.images) && p.images.length > 0 && p.images[0] !== '__cache__')
-      ? p.images
+    const orderedImages = Array.isArray(p.images) && p.images.length > 0
+      ? [p.main_image, ...p.images.filter((img) => img !== p.main_image)].filter(Boolean)
       : existingImgs.length > 0
         ? existingImgs
         : [p.image_url || p.image].filter(Boolean);
+    const initialImages = orderedImages;
+    setCoverIndex(0);
 
     setForm({
       title: p.title || p.name || '',
@@ -244,15 +247,23 @@ export default function VendorProductsPage() {
       return Object.assign(optimizedFile, { preview: URL.createObjectURL(optimizedFile) });
     })).then((processedFiles) => {
       setForm((prev) => {
-        const newImages = [...prev.images];
-        for (const pf of processedFiles) {
-          if (!newImages.some(img => img.name === pf.name && img.size === pf.size)) {
-            newImages.push(pf);
+        const existingImages = [...prev.images];
+        const mergedImages = [...processedFiles, ...existingImages];
+        const uniqueImages = [];
+
+        for (const img of mergedImages) {
+          const key = img instanceof File ? `${img.name}-${img.size}` : String(img);
+          if (!uniqueImages.some((existing) => {
+            if (existing instanceof File) return `${existing.name}-${existing.size}` === key;
+            return String(existing) === key;
+          })) {
+            uniqueImages.push(img);
           }
         }
+
         return {
           ...prev,
-          images: newImages.slice(0, 10),
+          images: uniqueImages.slice(0, 10),
         };
       });
       showToast(`${validFiles.length} photo(s) optimisée(s) et prête(s) !`);
@@ -320,13 +331,21 @@ export default function VendorProductsPage() {
       fd.append('flashSaleActive', form.flashSaleActive);
       if (form.flashSalePrice) fd.append('flashSalePrice', form.flashSalePrice);
 
-      form.images.forEach((img) => {
+      const orderedImages = form.images.length > 1
+        ? [form.images[coverIndex], ...form.images.filter((_, index) => index !== coverIndex)]
+        : form.images;
+      const remoteImageUrls = orderedImages.filter((img) => {
+        if (typeof img !== 'string') return false;
+        return img.startsWith('http') || img.startsWith('/') || img.startsWith('data:image/');
+      });
+
+      if (remoteImageUrls.length > 0) {
+        fd.append('imageUrls', JSON.stringify(remoteImageUrls));
+      }
+
+      orderedImages.forEach((img) => {
         if (img instanceof File) {
           fd.append('images', img);
-        } else if (typeof img === 'string' && img.length > 5 && img !== '__cache__') {
-          fd.append('images', img);
-        } else if (img?.preview && typeof img.preview === 'string') {
-          fd.append('images', img.preview);
         }
       });
 

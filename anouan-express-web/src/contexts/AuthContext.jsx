@@ -94,7 +94,9 @@ export function AuthProvider({ children }) {
   // ─── Helpers privés ──────────────────────────────────────
   const _persistSession = (payload) => {
     const { user: u, accessToken } = payload || {};
-    if (accessToken) localStorage.setItem('accessToken', accessToken);
+    // Le serveur renvoie le token dans la réponse pour les clients mobiles,
+    // mais le navigateur doit s’appuyer sur le cookie HttpOnly pour rester sûr.
+    localStorage.removeItem('accessToken');
     if (u) localStorage.setItem('user', JSON.stringify(u));
     if (u) setUser(u);
     return { user: u, accessToken };

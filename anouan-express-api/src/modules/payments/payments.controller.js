@@ -12,7 +12,8 @@ exports.initiatePayment = async (req, res, next) => {
 
 exports.handleWebhook = async (req, res, next) => {
   try {
-    const result = await paymentsService.handleWebhook(req.body);
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+    const result = await paymentsService.handleWebhook(req.body, req.headers, rawBody);
     res.json({ success: true, ...result });
   } catch (err) {
     next(err);

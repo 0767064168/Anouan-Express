@@ -71,10 +71,15 @@ const getCatalog = async (filters, pagination) => {
     SELECT p.id, p.title, p.title as name, p.slug, p.description, p.price, p.stock, p.avg_rating as rating, p.review_count,
            p.category_id, p.status, p.created_at,
            COALESCE(v.shop_name, 'Boutique Anouan Bouaké') as vendor_name,
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as main_image,
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as image_url,
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as image,
-           fs.discount_percent, fs.flash_price as discount_price, fs.ends_at as flash_sale_ends_at
+           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as main_image,
+           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as image_url,
+           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as image,
+           COALESCE((SELECT json_agg(pi.image_url ORDER BY pi.is_primary DESC, pi.id DESC)
+                     FROM product_images pi WHERE pi.product_id = p.id), '[]'::json) as images,
+           p.flash_sale_active, p.flash_sale_price,
+           fs.discount_percent, fs.flash_price as discount_price,
+           COALESCE(fs.flash_price, CASE WHEN p.flash_sale_active THEN p.flash_sale_price END) as sale_price,
+           fs.ends_at as flash_sale_ends_at
     FROM products p
     LEFT JOIN vendors v ON p.vendor_id = v.id
     LEFT JOIN flash_sales fs ON p.id = fs.product_id AND fs.is_active = true AND NOW() BETWEEN fs.starts_at AND fs.ends_at
@@ -95,7 +100,10 @@ const getCatalog = async (filters, pagination) => {
 const getById = async (productId) => {
   const productSql = `
     SELECT p.*, v.shop_name as store_name, v.logo_url as vendor_logo,
-           fs.discount_percent, fs.flash_price as discount_price, fs.ends_at as flash_sale_ends_at
+          p.flash_sale_active, p.flash_sale_price,
+          fs.discount_percent, fs.flash_price as discount_price,
+          COALESCE(fs.flash_price, CASE WHEN p.flash_sale_active THEN p.flash_sale_price END) as sale_price,
+          fs.ends_at as flash_sale_ends_at
     FROM products p
     JOIN vendors v ON p.vendor_id = v.id
     LEFT JOIN flash_sales fs ON p.id = fs.product_id AND fs.is_active = true AND NOW() BETWEEN fs.starts_at AND fs.ends_at
@@ -109,7 +117,7 @@ const getById = async (productId) => {
   
   const product = productRows[0];
   
-  const imagesSql = `SELECT id, image_url, is_primary FROM product_images WHERE product_id = $1 ORDER BY is_primary DESC, id ASC`;
+  const imagesSql = `SELECT id, image_url, is_primary FROM product_images WHERE product_id = $1 ORDER BY is_primary DESC, id DESC`;
   const { rows: images } = await query(imagesSql, [productId]);
   
   const variantsSql = `SELECT id, name, sku, price_delta as price_modifier, stock FROM product_variants WHERE product_id = $1`;
@@ -137,7 +145,7 @@ const search = async (searchQuery, limit = 10) => {
 const getFeatured = async () => {
   const sql = `
     SELECT p.id, p.title, p.slug, p.price, p.avg_rating,
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as main_image
+           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as main_image
     FROM products p
     WHERE p.is_featured = true AND p.status = 'active'
     LIMIT 12
@@ -150,7 +158,7 @@ const getFlashSales = async () => {
   const sql = `
     SELECT p.id, p.title, p.slug, p.price, p.avg_rating,
            fs.discount_percent, fs.flash_price as discount_price, fs.ends_at,
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as main_image
+           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as main_image
     FROM products p
     JOIN flash_sales fs ON p.id = fs.product_id
     WHERE fs.is_active = true AND NOW() BETWEEN fs.starts_at AND fs.ends_at AND p.status = 'active'
@@ -177,7 +185,9 @@ const getVendorProducts = async (vendorId, page = 1, limit = 20, status = null) 
 
   const sql = `
     SELECT p.*, 
-           (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id ASC LIMIT 1) as main_image
+          (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY is_primary DESC, id DESC LIMIT 1) as main_image,
+          COALESCE((SELECT json_agg(pi.image_url ORDER BY pi.is_primary DESC, pi.id DESC)
+          FROM product_images pi WHERE pi.product_id = p.id), '[]'::json) as images
     FROM products p
     WHERE p.vendor_id = $1 AND ${statusFilter}
     ORDER BY p.created_at DESC

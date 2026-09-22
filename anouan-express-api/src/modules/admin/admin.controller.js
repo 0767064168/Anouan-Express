@@ -197,6 +197,16 @@ const getAuditLogs = async (req, res, next) => {
   }
 };
 
+const getWeeklyReport = async (req, res, next) => {
+  try {
+    const weekOffset = parseInt(req.query.weekOffset || '0', 10);
+    const data = await adminService.getWeeklyReport(weekOffset);
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   getBanners,
   createBanner,
@@ -218,5 +228,6 @@ module.exports = {
   assignAgentStore,
   updateAgent,
   assignRole,
-  getAuditLogs
+  getAuditLogs,
+  getWeeklyReport,
 };

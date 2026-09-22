@@ -88,13 +88,27 @@ const create = async (req, res, next) => {
       }
     }
 
+    if (typeof data.imageUrls === 'string') {
+      try {
+        const parsed = JSON.parse(data.imageUrls);
+        data.imageUrls = Array.isArray(parsed) ? parsed : [parsed].filter(Boolean);
+      } catch (e) {
+        data.imageUrls = String(data.imageUrls)
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    }
+
     data.flashSaleActive = data.flashSaleActive === 'true' || data.flashSaleActive === true;
     if (data.flashSalePrice !== undefined) {
       data.flashSalePrice = parseInt(data.flashSalePrice, 10);
     }
 
     if (req.files && req.files.length > 0) {
-      data.imageUrls = req.files.map(file => `/uploads/products/${file.filename}`);
+      const uploadedUrls = req.files.map(file => `/uploads/products/${file.filename}`);
+      const existingUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
+      data.imageUrls = [...existingUrls, ...uploadedUrls];
     }
 
     const newProduct = await productsService.create(vendorId, data);
@@ -116,13 +130,27 @@ const update = async (req, res, next) => {
       } catch (e) {}
     }
 
+    if (typeof data.imageUrls === 'string') {
+      try {
+        const parsed = JSON.parse(data.imageUrls);
+        data.imageUrls = Array.isArray(parsed) ? parsed : [parsed].filter(Boolean);
+      } catch (e) {
+        data.imageUrls = String(data.imageUrls)
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    }
+
     data.flashSaleActive = data.flashSaleActive === 'true' || data.flashSaleActive === true;
     if (data.flashSalePrice !== undefined) {
       data.flashSalePrice = parseInt(data.flashSalePrice, 10);
     }
 
     if (req.files && req.files.length > 0) {
-      data.imageUrls = req.files.map(file => `/uploads/products/${file.filename}`);
+      const uploadedUrls = req.files.map(file => `/uploads/products/${file.filename}`);
+      const existingUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
+      data.imageUrls = [...existingUrls, ...uploadedUrls];
     }
 
     const result = await productsService.update(req.params.id, vendorId, data, isAdmin);

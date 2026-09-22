@@ -13,10 +13,10 @@ router.get('/', authenticateOptional, validate({ query: catalogQuerySchema }), p
 router.get('/search', productsController.search);
 router.get('/featured', productsController.getFeatured);
 router.get('/flash-sales', productsController.getFlashSales);
-router.get('/:id', productsController.getById);
 
 // Vendor & Admin routes
 router.get('/vendor/me', authenticate, authorize('vendor', 'admin'), productsController.getVendorProducts);
+router.get('/:id', productsController.getById);
 router.post('/', authenticate, authorize('vendor', 'admin'), uploadProductImages, optimizeUploadedImage, validate({ body: createSchema }), productsController.create);
 router.put('/:id', authenticate, authorize('vendor', 'admin'), uploadProductImages, optimizeUploadedImage, validate({ body: updateSchema }), productsController.update);
 router.patch('/:id/stock', authenticate, authorize('vendor', 'admin'), validate({ body: adjustStockSchema }), productsController.adjustStock);

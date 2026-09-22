@@ -54,6 +54,7 @@ const AdminContentPage   = lazy(() => import('./pages/admin/AdminContentPage'));
 const AdminMarketingPage = lazy(() => import('./pages/admin/AdminMarketingPage'));
 const AdminSettingsPage  = lazy(() => import('./pages/admin/AdminSettingsPage'));
 const AdminStoresPage    = lazy(() => import('./pages/admin/AdminStoresPage'));
+const AdminWeeklyReportPage = lazy(() => import('./pages/admin/AdminWeeklyReportPage'));
 
 // ─── Pages Vendor (lazy) ──────────────────────────────────────
 const VendorLayout        = lazy(() => import('./pages/vendor/VendorLayout'));
@@ -161,6 +162,7 @@ function App() {
                   <Route path="/admin/settings"       element={<AdminSettingsPage />} />
                   <Route path="/admin/stores"         element={<AdminStoresPage />} />
                   <Route path="/admin/agent"          element={<PickupAgentPage />} />
+                  <Route path="/admin/reports/weekly" element={<AdminWeeklyReportPage />} />
                 </Route>
               </Route>
 

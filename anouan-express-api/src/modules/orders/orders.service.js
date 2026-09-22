@@ -1,6 +1,6 @@
 const { query, withTransaction } = require('../../config/database');
 const { AppError } = require('../../middlewares/errorHandler');
-const { smsNewOrder } = require('../../utils/smsService');
+const { smsNewOrder, smsNewOrderAgent } = require('../../utils/smsService');
 const { pushNewOrderVendor, pushOrderCreated } = require('../../utils/pushNotification');
 const { generateInvoice, generateDeliverySlip } = require('../../utils/pdfGenerator');
 
@@ -194,6 +194,66 @@ class OrdersService {
         console.warn('[NOTIF] Erreur insertion notification:', e.message);
       }
       
+      // ─── Notification agents du store destination ─────────────────
+      try {
+        const { rows: storeAgents } = await client.query(`
+          SELECT u.id, u.phone, u.fcm_token, s.name as store_name
+          FROM users u
+          JOIN stores s ON u.store_id = s.id
+          WHERE u.store_id::text = $1::text AND u.role = 'agent'
+        `, [String(validStoreId)]);
+
+        if (storeAgents.length > 0) {
+          const { sendNotification } = require('../notifications/sse');
+          const { sendPushNotification } = require('../../config/firebase');
+          const storeName = storeAgents[0]?.store_name || 'Point relais';
+          const itemsCount = orderItemsToInsert.length;
+          const totalFormatted = new Intl.NumberFormat('fr-CI').format(order.total_amount);
+
+          for (const agent of storeAgents) {
+            try {
+              // Notification DB
+              await client.query(`
+                INSERT INTO notifications (user_id, type, title, body, metadata)
+                VALUES ($1, 'new_order_store', $2, $3, $4)
+              `, [
+                agent.id,
+                `📦 Nouvelle commande au ${storeName}`,
+                `Commande #${String(order.id).slice(0, 8).toUpperCase()} — ${itemsCount} article(s) — ${totalFormatted} FCFA`,
+                JSON.stringify({ orderId: order.id, totalAmount: order.total_amount, itemsCount })
+              ]);
+
+              // SSE temps réel
+              sendNotification(String(agent.id), {
+                type: 'new_order_store',
+                title: `📦 Nouvelle commande au ${storeName}`,
+                message: `Commande #${String(order.id).slice(0, 8).toUpperCase()} — ${itemsCount} article(s) — ${totalFormatted} FCFA`,
+                orderId: order.id,
+              });
+
+              // SMS
+              if (agent.phone && typeof smsNewOrderAgent === 'function') {
+                smsNewOrderAgent(agent.phone, { orderId: order.id, storeName, itemsCount }).catch(console.error);
+              }
+
+              // Push FCM
+              if (agent.fcm_token && typeof sendPushNotification === 'function') {
+                sendPushNotification(
+                  agent.fcm_token,
+                  `📦 Nouvelle commande — ${storeName}`,
+                  `Commande #${String(order.id).slice(0, 8).toUpperCase()} — ${itemsCount} art. — ${totalFormatted} FCFA`,
+                  { orderId: String(order.id), type: 'new_order_store' }
+                ).catch(console.error);
+              }
+            } catch (agentErr) {
+              console.warn('[AGENT NOTIF] Erreur notification agent:', agentErr.message);
+            }
+          }
+        }
+      } catch (agentNotifErr) {
+        console.warn('[AGENT NOTIF] Erreur récupération agents:', agentNotifErr.message);
+      }
+
       // ─── Notification SSE temps réel aux vendeurs ──────────────
       try {
         const { sendNotification } = require('../notifications/sse');
@@ -644,6 +704,36 @@ class OrdersService {
       console.warn('[orders.service] setDelegate fallback:', err.message);
       return { id: orderId, delegate_name: delegateName, delegate_phone: delegatePhone };
     }
+  }
+
+  async getAgentStats(storeId) {
+    if (!storeId) throw new AppError('store_id manquant pour les stats agent', 400);
+
+    const { rows } = await query(`
+      SELECT
+        COUNT(*)                                                                    AS total_orders,
+        COUNT(*) FILTER (WHERE o.status NOT IN ('picked_up','cancelled'))           AS pending_orders,
+        COUNT(*) FILTER (WHERE o.status = 'ready_for_pickup')                       AS ready_orders,
+        COUNT(*) FILTER (WHERE o.status = 'shipped_to_store')                       AS in_transit_orders,
+        COUNT(*) FILTER (WHERE o.status = 'picked_up')                              AS picked_up_orders,
+        COUNT(*) FILTER (WHERE DATE(o.created_at) = CURRENT_DATE)                   AS orders_today,
+        COUNT(*) FILTER (WHERE o.status = 'picked_up' AND DATE(o.updated_at) = CURRENT_DATE) AS picked_up_today,
+        COALESCE(SUM(o.total_amount) FILTER (WHERE o.status = 'picked_up'), 0)      AS total_delivered_value,
+        COALESCE(SUM(o.total_amount) FILTER (
+          WHERE o.payment_method = 'cash'
+            AND o.status NOT IN ('picked_up','cancelled')
+        ), 0)                                                                        AS cash_to_collect,
+        COALESCE(SUM(o.total_amount) FILTER (
+          WHERE o.payment_method = 'cash'
+            AND o.status = 'picked_up'
+            AND DATE(o.updated_at) = CURRENT_DATE
+        ), 0)                                                                        AS cash_collected_today
+      FROM orders o
+      WHERE o.store_id::text = $1::text
+        AND o.status != 'cancelled'
+    `, [String(storeId)]);
+
+    return rows[0] || {};
   }
 }
 

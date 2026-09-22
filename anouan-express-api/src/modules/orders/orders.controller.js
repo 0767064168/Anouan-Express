@@ -125,3 +125,16 @@ exports.setDelegate = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getAgentStats = async (req, res, next) => {
+  try {
+    const storeId = req.user.store_id;
+    if (!storeId) {
+      return res.status(403).json({ success: false, message: 'Votre compte Agent n\u2019est pas affecté à un point relais.', code: 'AGENT_STORE_REQUIRED' });
+    }
+    const stats = await ordersService.getAgentStats(storeId);
+    res.json({ success: true, data: stats });
+  } catch (err) {
+    next(err);
+  }
+};

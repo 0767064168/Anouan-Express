@@ -49,4 +49,7 @@ router.put('/roles/:userId', validate({ body: assignRoleSchema }), adminControll
 // Audit Logs
 router.get('/audit-logs', adminController.getAuditLogs);
 
+// Reports
+router.get('/reports/weekly', adminController.getWeeklyReport);
+
 module.exports = router;

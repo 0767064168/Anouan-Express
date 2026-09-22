@@ -11,6 +11,7 @@ router.get('/my', authenticate, authorize('client', 'admin'), ordersController.g
 router.get('/my/stats', authenticate, authorize('client', 'admin'), ordersController.getMyStats);
 router.get('/vendor', authenticate, authorize('vendor', 'admin'), ordersController.getVendorOrders);
 router.get('/', authenticate, authorize('admin', 'agent'), ordersController.getAllOrders);
+router.get('/agent/stats', authenticate, authorize('agent', 'admin'), ordersController.getAgentStats);
 router.patch('/:id/delegate', authenticate, authorize('client', 'admin'), ordersController.setDelegate);
 router.get('/:id', authenticate, ordersController.getOrderById);
 router.patch('/:id/status', authenticate, authorize('admin', 'agent', 'vendor'), ordersController.updateOrderStatus);

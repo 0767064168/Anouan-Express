@@ -614,6 +614,155 @@ const getAuditLogs = async (page, limit, filters) => {
   };
 };
 
+// ─── Rapport hebdomadaire ─────────────────────────────────────────────────────
+const getWeeklyReport = async (weekOffset = 0) => {
+  // Calcul des bornes : lundi 00:00 → dimanche 23:59 de la semaine choisie
+  const offset = parseInt(weekOffset, 10) || 0;
+  const now = new Date();
+  const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // 1=lun, 7=dim
+  const mondayThisWeek = new Date(now);
+  mondayThisWeek.setDate(now.getDate() - dayOfWeek + 1 + offset * 7);
+  mondayThisWeek.setHours(0, 0, 0, 0);
+  const sundayThisWeek = new Date(mondayThisWeek);
+  sundayThisWeek.setDate(mondayThisWeek.getDate() + 6);
+  sundayThisWeek.setHours(23, 59, 59, 999);
+
+  const mondayPrev = new Date(mondayThisWeek);
+  mondayPrev.setDate(mondayThisWeek.getDate() - 7);
+  const sundayPrev = new Date(sundayThisWeek);
+  sundayPrev.setDate(sundayThisWeek.getDate() - 7);
+
+  // Commandes par jour de la semaine courante
+  const { rows: dailyRows } = await query(`
+    SELECT
+      TO_CHAR(created_at, 'ID')::int AS day_num,
+      TO_CHAR(created_at, 'YYYY-MM-DD') AS day_date,
+      COUNT(*) AS orders_count,
+      COALESCE(SUM(total_amount), 0) AS revenue
+    FROM orders
+    WHERE created_at >= $1 AND created_at <= $2
+      AND status != 'cancelled'
+    GROUP BY day_num, day_date
+    ORDER BY day_num ASC
+  `, [mondayThisWeek, sundayThisWeek]);
+
+  // KPIs semaine courante
+  const { rows: kpiRows } = await query(`
+    SELECT
+      COUNT(*) AS total_orders,
+      COALESCE(SUM(total_amount), 0) AS total_revenue,
+      COUNT(*) FILTER (WHERE status = 'picked_up') AS picked_up,
+      COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
+      COUNT(*) FILTER (WHERE payment_method = 'cash') AS cash_orders,
+      COUNT(*) FILTER (WHERE payment_method != 'cash') AS mobile_orders,
+      COALESCE(SUM(total_amount) FILTER (WHERE payment_method = 'cash'), 0) AS cash_revenue,
+      COALESCE(SUM(total_amount) FILTER (WHERE payment_method != 'cash'), 0) AS mobile_revenue
+    FROM orders
+    WHERE created_at >= $1 AND created_at <= $2
+  `, [mondayThisWeek, sundayThisWeek]);
+
+  // KPIs semaine précédente (pour comparaison)
+  const { rows: prevKpiRows } = await query(`
+    SELECT
+      COUNT(*) AS total_orders,
+      COALESCE(SUM(total_amount), 0) AS total_revenue,
+      COUNT(*) FILTER (WHERE status = 'picked_up') AS picked_up
+    FROM orders
+    WHERE created_at >= $1 AND created_at <= $2
+  `, [mondayPrev, sundayPrev]);
+
+  // Top 5 vendeurs de la semaine
+  const { rows: topVendors } = await query(`
+    SELECT
+      v.store_name,
+      u.name AS vendor_name,
+      COUNT(DISTINCT oi.order_id) AS order_count,
+      COALESCE(SUM(oi.unit_price * oi.quantity), 0) AS revenue
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    JOIN vendors v ON oi.vendor_id = v.id
+    JOIN users u ON v.user_id = u.id
+    WHERE o.created_at >= $1 AND o.created_at <= $2
+      AND o.status != 'cancelled'
+    GROUP BY v.id, v.store_name, u.name
+    ORDER BY revenue DESC
+    LIMIT 5
+  `, [mondayThisWeek, sundayThisWeek]);
+
+  // Top 5 produits de la semaine
+  const { rows: topProducts } = await query(`
+    SELECT
+      oi.title,
+      SUM(oi.quantity) AS qty_sold,
+      COALESCE(SUM(oi.unit_price * oi.quantity), 0) AS revenue
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    WHERE o.created_at >= $1 AND o.created_at <= $2
+      AND o.status != 'cancelled'
+    GROUP BY oi.title
+    ORDER BY qty_sold DESC
+    LIMIT 5
+  `, [mondayThisWeek, sundayThisWeek]);
+
+  const kpi = kpiRows[0] || {};
+  const prevKpi = prevKpiRows[0] || {};
+
+  const pct = (curr, prev) => {
+    const c = parseFloat(curr) || 0;
+    const p = parseFloat(prev) || 0;
+    if (p === 0) return c > 0 ? 100 : 0;
+    return Math.round(((c - p) / p) * 100);
+  };
+
+  // Construire un tableau Lun–Dim avec 0 si pas de données
+  const DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+  const dailyMap = {};
+  dailyRows.forEach(r => { dailyMap[r.day_num] = r; });
+  const daily = DAYS.map((label, i) => ({
+    label,
+    date: dailyMap[i + 1]?.day_date || null,
+    orders: parseInt(dailyMap[i + 1]?.orders_count || 0, 10),
+    revenue: parseFloat(dailyMap[i + 1]?.revenue || 0),
+  }));
+
+  return {
+    week: {
+      start: mondayThisWeek.toISOString().slice(0, 10),
+      end: sundayThisWeek.toISOString().slice(0, 10),
+      offset,
+    },
+    daily,
+    kpi: {
+      total_orders: parseInt(kpi.total_orders || 0, 10),
+      total_revenue: parseFloat(kpi.total_revenue || 0),
+      picked_up: parseInt(kpi.picked_up || 0, 10),
+      cancelled: parseInt(kpi.cancelled || 0, 10),
+      cash_orders: parseInt(kpi.cash_orders || 0, 10),
+      mobile_orders: parseInt(kpi.mobile_orders || 0, 10),
+      cash_revenue: parseFloat(kpi.cash_revenue || 0),
+      mobile_revenue: parseFloat(kpi.mobile_revenue || 0),
+      avg_basket: parseInt(kpi.total_orders || 0) > 0
+        ? Math.round(parseFloat(kpi.total_revenue || 0) / parseInt(kpi.total_orders, 10))
+        : 0,
+    },
+    vs_prev: {
+      orders_pct: pct(kpi.total_orders, prevKpi.total_orders),
+      revenue_pct: pct(kpi.total_revenue, prevKpi.total_revenue),
+      picked_up_pct: pct(kpi.picked_up, prevKpi.picked_up),
+    },
+    top_vendors: topVendors.map(v => ({
+      name: v.store_name || v.vendor_name,
+      order_count: parseInt(v.order_count, 10),
+      revenue: parseFloat(v.revenue),
+    })),
+    top_products: topProducts.map(p => ({
+      title: p.title,
+      qty_sold: parseInt(p.qty_sold, 10),
+      revenue: parseFloat(p.revenue),
+    })),
+  };
+};
+
 module.exports = {
   getBanners,
   createBanner,
@@ -635,5 +784,6 @@ module.exports = {
   assignAgentStore,
   updateAgent,
   assignRole,
-  getAuditLogs
+  getAuditLogs,
+  getWeeklyReport,
 };

@@ -97,3 +97,34 @@ describe('finance.service.exportOrdersCSV', () => {
     expect(result).toContain('Boutique Test');
   });
 });
+
+describe('finance.service.exportInventoryCSV', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('includes stock, valuation and health data for a vendor inventory export', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{
+        product_id: 'prod-1',
+        product_title: 'Produit Test',
+        vendor_name: 'Boutique Test',
+        category_name: 'Électronique',
+        unit_price: '5000',
+        current_stock: 3,
+        inventory_valuation: '15000',
+        product_status: 'active',
+        stock_health: 'Stock critique',
+        created_at: '2026-09-19T10:00:00.000Z',
+      }],
+    });
+
+    const result = await financeService.exportInventoryCSV('vendor-1');
+    const exportQuery = db.query.mock.calls[0][0];
+
+    expect(exportQuery).toContain('p.vendor_id = $1');
+    expect(exportQuery).toContain('current_stock');
+    expect(result).toContain('Stock critique');
+    expect(result).toContain('Produit Test');
+  });
+});

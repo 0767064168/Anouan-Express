@@ -1,4 +1,6 @@
+const crypto = require('crypto');
 const db = require('../src/config/database');
+const env = require('../src/config/env');
 
 jest.mock('../src/config/database', () => ({
   query: jest.fn(),
@@ -31,6 +33,23 @@ describe('payments contract', () => {
 
     expect(result).toMatchObject({ id: 'pay_123', status: 'pending' });
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining('o.client_id = $2'), ['pay_123', 'client-1']);
+  });
+
+  it('rejects webhook requests when the signature is missing or invalid in production', async () => {
+    env.app.env = 'production';
+    env.payment.webhookSecret = 'webhook-secret';
+
+    const payload = { cpm_trans_id: 'pay_123', cpm_result: '00' };
+    const rawBody = JSON.stringify(payload);
+    const validSignature = crypto.createHmac('sha256', 'webhook-secret').update(rawBody).digest('hex');
+
+    await expect(
+      paymentsService.handleWebhook(payload, { 'x-cinetpay-signature': 'wrong-signature' }, rawBody)
+    ).rejects.toMatchObject({ code: 'WEBHOOK_SIGNATURE_INVALID' });
+
+    await expect(
+      paymentsService.handleWebhook(payload, { 'x-cinetpay-signature': validSignature }, rawBody)
+    ).resolves.toMatchObject({ received: true });
   });
 
   it('rejects an unknown payment for the current client', async () => {

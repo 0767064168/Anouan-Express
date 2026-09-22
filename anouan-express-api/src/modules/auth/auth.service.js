@@ -12,14 +12,19 @@ const { sendSMS } = require('../../utils/smsService');
 
 // ─── Tokens JWT ───────────────────────────────────────────────
 
+const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
+
 const generateTokens = (userId, role) => {
+  const accessJti = crypto.randomBytes(16).toString('hex');
+  const refreshJti = crypto.randomBytes(16).toString('hex');
+
   const accessToken = jwt.sign(
-    { sub: userId, role },
+    { sub: userId, role, jti: accessJti },
     env.jwt.secret,
     { expiresIn: env.jwt.accessExpiresIn }
   );
   const refreshToken = jwt.sign(
-    { sub: userId },
+    { sub: userId, jti: refreshJti },
     env.jwt.refreshSecret,
     { expiresIn: env.jwt.refreshExpiresIn }
   );
@@ -64,8 +69,8 @@ const register = async ({ name, email, phone, password, role = 'client', shopNam
 
     const tokens = generateTokens(user.id, user.role);
 
-    // Stocker le refresh token
-    await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
+    // Stocker le refresh token sous forme hachée pour éviter la réutilisation et le vol en base
+    await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [hashToken(tokens.refreshToken), user.id]);
 
     return { user, ...tokens };
   } catch (err) {
@@ -98,7 +103,7 @@ const loginWithPassword = async ({ email, password }) => {
     }
 
     const tokens = generateTokens(user.id, user.role);
-    await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
+    await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [hashToken(tokens.refreshToken), user.id]);
 
     const { password_hash, ...safeUser } = user;
     return { user: safeUser, ...tokens };
@@ -150,7 +155,7 @@ const verifyOTP = async ({ phone, otp }) => {
   await query('UPDATE users SET otp_code = NULL, otp_expires_at = NULL WHERE id = $1', [user.id]);
 
   const tokens = generateTokens(user.id, user.role);
-  await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
+  await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [hashToken(tokens.refreshToken), user.id]);
 
   const { otp_code, otp_expires_at, ...safeUser } = user;
   return { user: safeUser, ...tokens };
@@ -173,12 +178,15 @@ const refreshAccessToken = async ({ refreshToken }) => {
   if (!result.rows.length) throw new AppError('Utilisateur introuvable.', 401, 'USER_NOT_FOUND');
 
   const user = result.rows[0];
-  if (user.refresh_token !== refreshToken) {
-    throw new AppError('Token de rafraîchissement révoqué.', 401, 'TOKEN_REVOKED');
+  const hashedToken = hashToken(refreshToken);
+  const isValidStoredToken = user.refresh_token === hashedToken || user.refresh_token === refreshToken;
+
+  if (!isValidStoredToken) {
+    throw new AppError('Token de rafraîchissement invalide ou révoqué.', 401, 'INVALID_REFRESH_TOKEN');
   }
 
   const tokens = generateTokens(user.id, user.role);
-  await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [tokens.refreshToken, user.id]);
+  await query('UPDATE users SET refresh_token = $1 WHERE id = $2', [hashToken(tokens.refreshToken), user.id]);
 
   return tokens;
 };

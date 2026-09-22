@@ -39,6 +39,8 @@ const getCookie = (name) => {
   return match ? decodeURIComponent(match[1]) : null;
 };
 
+const hasSessionCookie = () => document.cookie.split(';').some((cookie) => cookie.trim().startsWith('accessToken='));
+
 api.interceptors.request.use((config) => {
   const csrfToken = getCookie('csrfToken');
   if (csrfToken && !['get', 'head', 'options'].includes((config.method || 'get').toLowerCase())) {
@@ -68,7 +70,7 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    const hasSessionHint = Boolean(localStorage.getItem('accessToken') || getCookie('csrfToken'));
+    const hasSessionHint = Boolean(localStorage.getItem('accessToken') || getCookie('csrfToken') || hasSessionCookie());
     if (error.response?.status === 401 && hasSessionHint && !originalRequest._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -169,6 +171,7 @@ export const ordersAPI = {
     api.get(`/orders/${id}/invoice`, { responseType: 'blob' }),
   getMyStats: () => api.get('/orders/my/stats'),
   setDelegate: (orderId, data) => api.patch(`/orders/${orderId}/delegate`, data),
+  getAgentStats: () => api.get('/orders/agent/stats'),
 };
 
 export const paymentsAPI = {
@@ -250,6 +253,7 @@ export const adminAPI = {
   createAgent: (data) => api.post('/admin/agents', data),
   assignAgentStore: (userId, storeId) => api.put(`/admin/agents/${userId}/store`, { storeId }),
   updateAgent: (userId, data) => api.put(`/admin/agents/${userId}`, data),
+  getWeeklyReport: (params) => api.get('/admin/reports/weekly', { params }),
 };
 
 export const messagesAPI = {
