@@ -243,6 +243,32 @@ export default function AdminWeeklyReportPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Meilleur jour</p>
+                <p className="text-xl font-black text-white">{report.summary?.best_day?.label || '—'}</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {report.summary?.best_day?.orders || 0} commandes • {formatPrice(report.summary?.best_day?.revenue || 0)}
+                </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Panier moyen</p>
+                <p className="text-xl font-black text-white">{formatPrice(report.kpi?.avg_order_value || 0)}</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {report.kpi?.avg_order_value ? 'Moyenne de la semaine' : 'Pas de commande'}
+                </p>
+              </div>
+
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-2">Taux d’annulation</p>
+                <p className="text-xl font-black text-white">{report.kpi?.cancel_rate ?? 0}%</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {report.summary?.cancelled_orders || 0} commandes annulées
+                </p>
+              </div>
+            </div>
+
             {/* Paiements & Top Produits */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6">

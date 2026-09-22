@@ -67,6 +67,68 @@ describe('admin.service.getDashboardStats', () => {
   });
 });
 
+describe('admin.service.getWeeklyReport', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('returns rich KPI and comparison data for the selected week', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-09-23T12:00:00Z'));
+
+    db.query
+      .mockResolvedValueOnce({
+        rows: [
+          { day_num: 1, day_date: '2026-09-21', orders_count: '5', revenue: '175000' },
+          { day_num: 2, day_date: '2026-09-22', orders_count: '4', revenue: '260000' },
+        ],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          total_orders: '9',
+          total_revenue: '435000',
+          completed_orders: '7',
+          picked_up: '6',
+          cancelled: '2',
+          cash_orders: '3',
+          mobile_orders: '6',
+          cash_revenue: '90000',
+          mobile_revenue: '345000',
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{
+          total_orders: '7',
+          total_revenue: '320000',
+          completed_orders: '5',
+          picked_up: '4',
+          cancelled: '1',
+        }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ shop_name: 'Boutique A', vendor_name: 'Moussa', order_count: '4', revenue: '220000' }],
+      })
+      .mockResolvedValueOnce({
+        rows: [{ title: 'Produit X', qty_sold: '9', revenue: '180000' }],
+      });
+
+    const result = await adminService.getWeeklyReport(0);
+
+    expect(result.week.start).toBe('2026-09-21');
+    expect(result.kpi.total_orders).toBe(9);
+    expect(result.kpi.completed_orders).toBe(7);
+    expect(result.kpi.cancel_rate).toBe(22);
+    expect(result.kpi.avg_order_value).toBe(48333);
+    expect(result.vs_prev.orders_pct).toBe(29);
+    expect(result.vs_prev.revenue_pct).toBe(36);
+    expect(result.daily[0]).toMatchObject({ label: 'Lun', orders: 5, revenue: 175000, completed_orders: 0, cancelled_orders: 0 });
+    expect(result.summary.best_day).toMatchObject({ label: 'Mar', orders: 4, revenue: 260000 });
+    expect(result.top_vendors[0]).toMatchObject({ name: 'Boutique A', order_count: 4, revenue: 220000 });
+    expect(db.query.mock.calls[3][0]).toContain('v.shop_name');
+
+    jest.useRealTimers();
+  });
+});
+
 describe('admin.service.createAgent', () => {
   beforeEach(() => {
     jest.resetAllMocks();

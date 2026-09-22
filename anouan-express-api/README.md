@@ -165,3 +165,42 @@ Voir `.env.example` pour la liste complète.
 | `FCM_*` | Firebase Cloud Messaging |
 | `SMTP_*` | Configuration email |
 | `INFOBIP_*` | Passerelle SMS |
+
+## Checklist de déploiement Render / Vercel
+
+### Render — API
+
+Configurer ces variables dans le service API Render :
+
+```text
+NODE_ENV=production
+CLIENT_URL=https://<votre-projet>.vercel.app
+ALLOWED_ORIGINS=https://<votre-projet>.vercel.app
+JWT_SECRET=<secret aleatoire de 32 caracteres minimum>
+JWT_REFRESH_SECRET=<autre secret aleatoire de 32 caracteres minimum>
+CINETPAY_NOTIFY_URL=https://<api-render>.onrender.com/api/payments/webhook
+CINETPAY_RETURN_URL=https://<votre-projet>.vercel.app/payment/callback
+```
+
+Ajouter également les variables PostgreSQL (`DATABASE_URL` ou `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) et les identifiants réellement utilisés : CinetPay, SMTP, Infobip et Firebase. Les deux secrets JWT doivent être distincts et ne doivent jamais reprendre les valeurs de `.env.example`.
+
+### Vercel — frontend
+
+Dans les variables d’environnement du projet Vercel, configurer pour l’environnement Production :
+
+```text
+VITE_API_URL=https://<api-render>.onrender.com/api
+```
+
+Après modification de `VITE_API_URL`, relancer un déploiement Vercel : les variables `VITE_*` sont intégrées au build frontend.
+
+### Vérification avant mise en ligne
+
+Depuis `anouan-express-api` :
+
+```bash
+npm test -- --runInBand
+node scripts/deploy-check.js
+```
+
+Tester ensuite `https://<api-render>.onrender.com/health`, la connexion frontend, le rafraîchissement de session, un paiement de test et la réception du webhook CinetPay. Ne pas utiliser `*` dans `ALLOWED_ORIGINS` avec les cookies d’authentification.

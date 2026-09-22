@@ -29,6 +29,10 @@ const defaultAllowedOrigins = [
   'capacitor://localhost',
   'http://localhost',
 ];
+const configuredOrigins = optional('ALLOWED_ORIGINS')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 if (appEnv === 'production') {
   const invalidSecret = (value) => !value || value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme') || value.startsWith('test');
@@ -118,12 +122,10 @@ module.exports = {
   },
 
   cors: {
-    origins: [...new Set([
-      ...optional('ALLOWED_ORIGINS', defaultAllowedOrigins.join(','))
-        .split(',')
-        .map((o) => o.trim())
-        .filter(Boolean),
-      ...defaultAllowedOrigins,
-    ])],
+    origins: [...new Set(
+      appEnv === 'production'
+        ? configuredOrigins
+        : [...configuredOrigins, ...defaultAllowedOrigins]
+    )],
   },
 };

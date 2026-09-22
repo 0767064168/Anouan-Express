@@ -638,7 +638,9 @@ const getWeeklyReport = async (weekOffset = 0) => {
       TO_CHAR(created_at, 'ID')::int AS day_num,
       TO_CHAR(created_at, 'YYYY-MM-DD') AS day_date,
       COUNT(*) AS orders_count,
-      COALESCE(SUM(total_amount), 0) AS revenue
+      COALESCE(SUM(total_amount), 0) AS revenue,
+      COUNT(*) FILTER (WHERE status = 'picked_up') AS completed_orders,
+      COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_orders
     FROM orders
     WHERE created_at >= $1 AND created_at <= $2
       AND status != 'cancelled'
@@ -651,12 +653,14 @@ const getWeeklyReport = async (weekOffset = 0) => {
     SELECT
       COUNT(*) AS total_orders,
       COALESCE(SUM(total_amount), 0) AS total_revenue,
+      COUNT(*) FILTER (WHERE status = 'picked_up') AS completed_orders,
       COUNT(*) FILTER (WHERE status = 'picked_up') AS picked_up,
       COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
       COUNT(*) FILTER (WHERE payment_method = 'cash') AS cash_orders,
       COUNT(*) FILTER (WHERE payment_method != 'cash') AS mobile_orders,
       COALESCE(SUM(total_amount) FILTER (WHERE payment_method = 'cash'), 0) AS cash_revenue,
-      COALESCE(SUM(total_amount) FILTER (WHERE payment_method != 'cash'), 0) AS mobile_revenue
+      COALESCE(SUM(total_amount) FILTER (WHERE payment_method != 'cash'), 0) AS mobile_revenue,
+      COALESCE(AVG(total_amount), 0) AS avg_order_value
     FROM orders
     WHERE created_at >= $1 AND created_at <= $2
   `, [mondayThisWeek, sundayThisWeek]);
@@ -666,7 +670,9 @@ const getWeeklyReport = async (weekOffset = 0) => {
     SELECT
       COUNT(*) AS total_orders,
       COALESCE(SUM(total_amount), 0) AS total_revenue,
-      COUNT(*) FILTER (WHERE status = 'picked_up') AS picked_up
+      COUNT(*) FILTER (WHERE status = 'picked_up') AS picked_up,
+      COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled,
+      COALESCE(AVG(total_amount), 0) AS avg_order_value
     FROM orders
     WHERE created_at >= $1 AND created_at <= $2
   `, [mondayPrev, sundayPrev]);
@@ -674,7 +680,7 @@ const getWeeklyReport = async (weekOffset = 0) => {
   // Top 5 vendeurs de la semaine
   const { rows: topVendors } = await query(`
     SELECT
-      v.store_name,
+      v.shop_name,
       u.name AS vendor_name,
       COUNT(DISTINCT oi.order_id) AS order_count,
       COALESCE(SUM(oi.unit_price * oi.quantity), 0) AS revenue
@@ -707,9 +713,11 @@ const getWeeklyReport = async (weekOffset = 0) => {
   const kpi = kpiRows[0] || {};
   const prevKpi = prevKpiRows[0] || {};
 
+  const safeNumber = (value) => parseFloat(value) || 0;
+
   const pct = (curr, prev) => {
-    const c = parseFloat(curr) || 0;
-    const p = parseFloat(prev) || 0;
+    const c = safeNumber(curr);
+    const p = safeNumber(prev);
     if (p === 0) return c > 0 ? 100 : 0;
     return Math.round(((c - p) / p) * 100);
   };
@@ -723,7 +731,28 @@ const getWeeklyReport = async (weekOffset = 0) => {
     date: dailyMap[i + 1]?.day_date || null,
     orders: parseInt(dailyMap[i + 1]?.orders_count || 0, 10),
     revenue: parseFloat(dailyMap[i + 1]?.revenue || 0),
+    completed_orders: parseInt(dailyMap[i + 1]?.completed_orders || 0, 10),
+    cancelled_orders: parseInt(dailyMap[i + 1]?.cancelled_orders || 0, 10),
   }));
+
+  const bestDay = daily.reduce((best, current) => {
+    if (!best) return current;
+    if (current.revenue > best.revenue) return current;
+    if (current.revenue === best.revenue && current.orders > best.orders) return current;
+    return best;
+  }, null) || { label: null, date: null, orders: 0, revenue: 0 };
+
+  const totalOrders = parseInt(kpi.total_orders || 0, 10);
+  const totalRevenue = safeNumber(kpi.total_revenue);
+  const totalCancelled = parseInt(kpi.cancelled || 0, 10);
+  const completedOrders = parseInt(kpi.completed_orders || kpi.picked_up || 0, 10);
+  const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+  const cancelRate = totalOrders > 0 ? Math.round((totalCancelled / totalOrders) * 100) : 0;
+
+  const previousCompletedOrders = parseInt(prevKpi.picked_up || 0, 10);
+  const previousCancelled = parseInt(prevKpi.cancelled || 0, 10);
+  const previousOrders = parseInt(prevKpi.total_orders || 0, 10);
+  const previousRevenue = safeNumber(prevKpi.total_revenue);
 
   return {
     week: {
@@ -732,26 +761,45 @@ const getWeeklyReport = async (weekOffset = 0) => {
       offset,
     },
     daily,
+    summary: {
+      total_orders: totalOrders,
+      total_revenue: totalRevenue,
+      completed_orders: completedOrders,
+      cancelled_orders: totalCancelled,
+      cancel_rate: cancelRate,
+      avg_order_value: avgOrderValue,
+      best_day: {
+        label: bestDay.label,
+        date: bestDay.date,
+        orders: bestDay.orders,
+        revenue: bestDay.revenue,
+      },
+    },
     kpi: {
-      total_orders: parseInt(kpi.total_orders || 0, 10),
-      total_revenue: parseFloat(kpi.total_revenue || 0),
-      picked_up: parseInt(kpi.picked_up || 0, 10),
-      cancelled: parseInt(kpi.cancelled || 0, 10),
+      total_orders: totalOrders,
+      total_revenue: totalRevenue,
+      completed_orders: completedOrders,
+      picked_up: completedOrders,
+      cancelled: totalCancelled,
       cash_orders: parseInt(kpi.cash_orders || 0, 10),
       mobile_orders: parseInt(kpi.mobile_orders || 0, 10),
-      cash_revenue: parseFloat(kpi.cash_revenue || 0),
-      mobile_revenue: parseFloat(kpi.mobile_revenue || 0),
-      avg_basket: parseInt(kpi.total_orders || 0) > 0
-        ? Math.round(parseFloat(kpi.total_revenue || 0) / parseInt(kpi.total_orders, 10))
-        : 0,
+      cash_revenue: safeNumber(kpi.cash_revenue),
+      mobile_revenue: safeNumber(kpi.mobile_revenue),
+      avg_basket: avgOrderValue,
+      avg_order_value: avgOrderValue,
+      cancel_rate: cancelRate,
     },
     vs_prev: {
-      orders_pct: pct(kpi.total_orders, prevKpi.total_orders),
-      revenue_pct: pct(kpi.total_revenue, prevKpi.total_revenue),
-      picked_up_pct: pct(kpi.picked_up, prevKpi.picked_up),
+      orders_pct: pct(totalOrders, previousOrders),
+      revenue_pct: pct(totalRevenue, previousRevenue),
+      picked_up_pct: pct(completedOrders, previousCompletedOrders),
+      completed_pct: pct(completedOrders, previousCompletedOrders),
+      cancelled_pct: pct(totalCancelled, previousCancelled),
+      avg_order_value_pct: pct(avgOrderValue, safeNumber(prevKpi.avg_order_value)),
+      cancel_rate_pct: pct(cancelRate, previousOrders > 0 ? Math.round((previousCancelled / previousOrders) * 100) : 0),
     },
     top_vendors: topVendors.map(v => ({
-      name: v.store_name || v.vendor_name,
+      name: v.shop_name || v.vendor_name,
       order_count: parseInt(v.order_count, 10),
       revenue: parseFloat(v.revenue),
     })),
