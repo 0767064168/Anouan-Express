@@ -690,7 +690,7 @@ const getWeeklyReport = async (weekOffset = 0) => {
     JOIN users u ON v.user_id = u.id
     WHERE o.created_at >= $1 AND o.created_at <= $2
       AND o.status != 'cancelled'
-    GROUP BY v.id, v.store_name, u.name
+    GROUP BY v.id, v.shop_name, u.name
     ORDER BY revenue DESC
     LIMIT 5
   `, [mondayThisWeek, sundayThisWeek]);

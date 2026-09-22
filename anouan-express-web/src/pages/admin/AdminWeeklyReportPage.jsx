@@ -91,7 +91,10 @@ export default function AdminWeeklyReportPage() {
       const res = await adminAPI.getWeeklyReport({ weekOffset: offset });
       setReport(res.data?.data || null);
     } catch (e) {
-      setError(e.response?.data?.message || 'Erreur lors du chargement du rapport.');
+      const apiError = e.response?.data?.error;
+      const message = apiError?.message || e.response?.data?.message || e.message;
+      const status = e.response?.status ? ` (${e.response.status})` : '';
+      setError(`${message || 'Erreur lors du chargement du rapport.'}${status}`);
     } finally {
       setLoading(false);
     }
