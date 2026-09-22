@@ -11,7 +11,7 @@ router.post('/initiate', authenticate, authorize('client'), paymentLimiter, vali
 router.post('/webhook', paymentsController.handleWebhook);
 router.get('/history', authenticate, authorize('client'), paymentsController.getPaymentHistory);
 router.get('/status/:transactionId', authenticate, authorize('client'), paymentsController.getPaymentStatus);
-router.get('/order/:orderId', authenticate, paymentsController.getPaymentByOrder);
-router.get('/poll/:orderId', authenticate, paymentsController.pollPayment);
+router.get('/order/:orderId', authenticate, authorize('client'), paymentsController.getPaymentByOrder);
+router.get('/poll/:orderId', authenticate, authorize('client'), paymentsController.pollPayment);
 
 module.exports = router;

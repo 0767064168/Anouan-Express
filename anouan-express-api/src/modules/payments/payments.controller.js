@@ -32,7 +32,7 @@ exports.getPaymentHistory = async (req, res, next) => {
 
 exports.getPaymentByOrder = async (req, res, next) => {
   try {
-    const payment = await paymentsService.getPaymentByOrder(req.params.orderId);
+    const payment = await paymentsService.getPaymentByOrder(req.params.orderId, req.user.id);
     res.json({ success: true, data: payment });
   } catch (err) {
     next(err);
@@ -50,7 +50,7 @@ exports.getPaymentStatus = async (req, res, next) => {
 
 exports.pollPayment = async (req, res, next) => {
   try {
-    const result = await paymentsService.pollPaymentStatus(req.params.orderId);
+    const result = await paymentsService.pollPaymentStatus(req.params.orderId, req.user.id);
     res.json({ success: true, data: result });
   } catch (err) {
     next(err);

@@ -245,12 +245,29 @@ class PaymentsService {
     return { data: rows, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getPaymentByOrder(orderId) {
+  async getPaymentByOrder(orderId, clientId = null) {
+    const { rows: orderRows } = await query(
+      'SELECT client_id FROM orders WHERE id::text = $1::text',
+      [String(orderId)]
+    );
+    if (!orderRows.length) throw new AppError('Commande introuvable.', 404, 'ORDER_NOT_FOUND');
+    if (clientId && orderRows[0].client_id !== clientId) {
+      throw new AppError('Accès refusé.', 403, 'FORBIDDEN');
+    }
+
     const { rows } = await query('SELECT * FROM payments WHERE order_id = $1', [orderId]);
     return rows[0] || null;
   }
 
-  async pollPaymentStatus(orderId) {
+  async pollPaymentStatus(orderId, clientId = null) {
+    const { rows: orderRows } = await query(
+      'SELECT client_id FROM orders WHERE id::text = $1::text',
+      [String(orderId)]
+    );
+    if (clientId && orderRows.length && orderRows[0].client_id !== clientId) {
+      throw new AppError('Accès refusé.', 403, 'FORBIDDEN');
+    }
+
     const { rows } = await query(
       'SELECT * FROM payments WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1',
       [orderId]

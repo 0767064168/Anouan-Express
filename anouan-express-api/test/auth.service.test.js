@@ -17,7 +17,29 @@ const { sendPasswordReset } = require('../src/utils/emailService');
 
 describe('auth.service password reset', () => {
   beforeEach(() => {
+    jest.resetModules();
     jest.resetAllMocks();
+    delete process.env.JWT_SECRET;
+    delete process.env.JWT_REFRESH_SECRET;
+    delete process.env.NODE_ENV;
+  });
+
+  it('rejects identical or weak JWT secrets in production', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalJwtSecret = process.env.JWT_SECRET;
+    const originalRefreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    process.env.NODE_ENV = 'production';
+    process.env.JWT_SECRET = '12345678901234567890123456789012';
+    process.env.JWT_REFRESH_SECRET = '12345678901234567890123456789012';
+
+    jest.isolateModules(() => {
+      expect(() => require('../src/config/env')).toThrow(/JWT_SECRET.*JWT_REFRESH_SECRET/i);
+    });
+
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = originalNodeEnv;
+    if (originalJwtSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = originalJwtSecret;
+    if (originalRefreshSecret === undefined) delete process.env.JWT_REFRESH_SECRET; else process.env.JWT_REFRESH_SECRET = originalRefreshSecret;
   });
 
   it('stores a dedicated reset token instead of reusing otp fields', async () => {
@@ -100,43 +122,60 @@ describe('auth.service password reset', () => {
   });
 
   it('rotates refresh tokens using a hashed stored value and rejects replayed tokens', async () => {
-    const oldRefreshToken = jwt.sign({ sub: 'user-1' }, process.env.JWT_REFRESH_SECRET || 'dev_only_refresh_change_me_32_chars', { expiresIn: '7d' });
+    const originalNodeEnv = process.env.NODE_ENV;
+    const originalJwtSecret = process.env.JWT_SECRET;
+    const originalRefreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    process.env.NODE_ENV = 'test';
+    process.env.JWT_SECRET = '12345678901234567890123456789012';
+    process.env.JWT_REFRESH_SECRET = 'abcdefghijklmnopqrstuvwxzy123456';
+
+    jest.resetModules();
+    const freshDb = require('../src/config/database');
+    const freshAuthService = require('../src/modules/auth/auth.service');
+
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+    const oldRefreshToken = jwt.sign({ sub: 'user-1' }, refreshSecret, { expiresIn: '7d' });
     const oldStoredHash = crypto.createHash('sha256').update(oldRefreshToken).digest('hex');
+    let currentStoredRefreshHash = oldStoredHash;
 
-    db.query
-      .mockResolvedValueOnce({
-        rows: [{
-          id: 'user-1',
-          role: 'client',
-          status: 'active',
-          refresh_token: oldStoredHash,
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [] });
+    freshDb.query.mockImplementation((sql, params = []) => {
+      if (sql.includes('SELECT id, role, status, refresh_token FROM users WHERE id = $1')) {
+        return Promise.resolve({
+          rows: [{
+            id: 'user-1',
+            role: 'client',
+            status: 'active',
+            refresh_token: currentStoredRefreshHash,
+          }],
+        });
+      }
 
-    const result = await authService.refreshAccessToken({ refreshToken: oldRefreshToken });
+      if (sql.includes('UPDATE users SET refresh_token = $1 WHERE id = $2')) {
+        currentStoredRefreshHash = crypto.createHash('sha256').update(params[0]).digest('hex');
+        return Promise.resolve({ rows: [] });
+      }
+
+      return Promise.resolve({ rows: [] });
+    });
+
+    const result = await freshAuthService.refreshAccessToken({ refreshToken: oldRefreshToken });
 
     expect(result.accessToken).toEqual(expect.any(String));
     expect(result.refreshToken).toEqual(expect.any(String));
-    expect(db.query.mock.calls[1][0]).toContain('UPDATE users SET refresh_token = $1');
-    expect(db.query.mock.calls[1][1][0]).not.toBe(oldStoredHash);
-    expect(db.query.mock.calls[1][1][0]).toBe(
+    expect(freshDb.query.mock.calls[1][0]).toContain('UPDATE users SET refresh_token = $1');
+    expect(freshDb.query.mock.calls[1][1][0]).not.toBe(oldStoredHash);
+    expect(freshDb.query.mock.calls[1][1][0]).toBe(
       crypto.createHash('sha256').update(result.refreshToken).digest('hex')
     );
 
-    const replayedHash = crypto.createHash('sha256').update(result.refreshToken).digest('hex');
-    db.query.mockResolvedValueOnce({
-      rows: [{
-        id: 'user-1',
-        role: 'client',
-        status: 'active',
-        refresh_token: replayedHash,
-      }],
-    });
-
     await expect(
-      authService.refreshAccessToken({ refreshToken: oldRefreshToken })
+      freshAuthService.refreshAccessToken({ refreshToken: oldRefreshToken })
     ).rejects.toMatchObject({ code: 'INVALID_REFRESH_TOKEN' });
+
+    if (originalNodeEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = originalNodeEnv;
+    if (originalJwtSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = originalJwtSecret;
+    if (originalRefreshSecret === undefined) delete process.env.JWT_REFRESH_SECRET; else process.env.JWT_REFRESH_SECRET = originalRefreshSecret;
   });
 
   it('rejects OTP login for banned accounts', async () => {

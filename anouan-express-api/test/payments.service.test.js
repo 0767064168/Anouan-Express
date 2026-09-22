@@ -7,6 +7,7 @@ jest.mock('../src/config/database', () => ({
 }));
 
 const paymentsService = require('../src/modules/payments/payments.service');
+const paymentsController = require('../src/modules/payments/payments.controller');
 const { initiatePaymentSchema } = require('../src/modules/payments/payments.validation');
 
 describe('payments contract', () => {
@@ -50,6 +51,39 @@ describe('payments contract', () => {
     await expect(
       paymentsService.handleWebhook(payload, { 'x-cinetpay-signature': validSignature }, rawBody)
     ).resolves.toMatchObject({ received: true });
+  });
+
+  it('accepts a valid signature when the webhook arrives as raw Buffer bytes', async () => {
+    env.app.env = 'production';
+    env.payment.webhookSecret = 'webhook-secret';
+
+    const payload = { cpm_trans_id: 'pay_raw', cpm_result: '00' };
+    const rawBody = Buffer.from(JSON.stringify(payload));
+    const validSignature = crypto.createHmac('sha256', 'webhook-secret').update(rawBody).digest('hex');
+
+    const req = {
+      body: rawBody,
+      headers: { 'x-cinetpay-signature': validSignature },
+    };
+    const res = { json: jest.fn() };
+    const next = jest.fn();
+
+    db.query.mockResolvedValueOnce({ rows: [] });
+
+    await paymentsController.handleWebhook(req, res, next);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true }));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects payment lookup when the current client does not own the order', async () => {
+    db.query.mockResolvedValueOnce({
+      rows: [{ id: 'order-1', client_id: 'client-1' }],
+    });
+
+    await expect(
+      paymentsService.getPaymentByOrder('order-1', { id: 'client-2', role: 'client' })
+    ).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
   });
 
   it('rejects an unknown payment for the current client', async () => {

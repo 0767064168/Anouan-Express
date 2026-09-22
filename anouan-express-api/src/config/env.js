@@ -10,7 +10,7 @@ const required = (key) => {
 
 const optional = (key, defaultVal = '') => process.env[key] || defaultVal;
 const isJestRuntime = !!process.env.JEST_WORKER_ID;
-const appEnv = isJestRuntime ? 'test' : optional('NODE_ENV', 'development');
+const appEnv = optional('NODE_ENV', isJestRuntime ? 'test' : 'development');
 const jwtSecret = optional('JWT_SECRET', 'dev_only_change_me_32_characters_minimum');
 const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'dev_only_refresh_change_me_32_chars');
 const defaultAllowedOrigins = [
@@ -31,9 +31,9 @@ const defaultAllowedOrigins = [
 ];
 
 if (appEnv === 'production') {
-  const invalidSecret = (value) => value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme');
-  if (invalidSecret(jwtSecret) || invalidSecret(jwtRefreshSecret)) {
-    throw new Error('JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes en production.');
+  const invalidSecret = (value) => !value || value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme') || value.startsWith('test');
+  if (invalidSecret(jwtSecret) || invalidSecret(jwtRefreshSecret) || jwtSecret === jwtRefreshSecret) {
+    throw new Error('JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes et distinctes en production.');
   }
 }
 
