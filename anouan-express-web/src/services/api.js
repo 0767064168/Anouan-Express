@@ -13,8 +13,11 @@ const resolveApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.startsWith('http')) return envUrl;
   if (isCapacitor()) {
-    // Sur smartphone Android réel, joindre directement le PC hôte
-    return 'http://192.168.11.40:5000/api';
+    // En production mobile : pointer vers le backend Railway
+    // En développement local : ADB reverse (localhost proxifié)
+    const prodApi = import.meta.env.VITE_API_URL_MOBILE;
+    if (prodApi) return prodApi;
+    return 'http://localhost:5000/api'; // dev via adb reverse tcp:5000
   }
   return envUrl || '/api';
 };

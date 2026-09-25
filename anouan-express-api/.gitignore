@@ -1,24 +1,9 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-
-# Dépendances
-node_modules/
-
-# Environnement
+﻿node_modules/
 .env
-
-# Uploads
-uploads/
-
-# Build
+.env.local
+.env.production
+uploads/*
+!uploads/.gitkeep
+*.log
+coverage/
 dist/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/

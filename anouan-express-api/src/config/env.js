@@ -51,6 +51,7 @@ module.exports = {
   },
 
   db: {
+    connectionString: optional('DATABASE_URL', ''),
     host: optional('DB_HOST', 'localhost'),
     port: parseInt(optional('DB_PORT', '5432'), 10),
     name: optional('DB_NAME', 'anouan_express'),
