@@ -149,8 +149,11 @@ const start = async () => {
   }
 };
 
-if (env.app.env !== 'test' && !process.env.JEST_WORKER_ID) {
+if (env.app.env !== 'test' && !process.env.JEST_WORKER_ID && !process.env.VERCEL) {
   start();
 }
 
-module.exports = { app, server, io }; // Pour les tests
+module.exports = app;
+module.exports.app = app;
+module.exports.server = server;
+module.exports.io = io;

@@ -166,41 +166,39 @@ Voir `.env.example` pour la liste complète.
 | `SMTP_*` | Configuration email |
 | `INFOBIP_*` | Passerelle SMS |
 
-## Checklist de déploiement Render / Vercel
+## Deploiement Vercel + Supabase
 
-### Render — API
+Le backend utilise Supabase comme PostgreSQL via `DATABASE_URL`. Il ne depend pas de Supabase Auth : l'inscription et les sessions restent gerees par Express.
 
-Configurer ces variables dans le service API Render :
+### 1. Deployer l'API Express sur Vercel
+
+Creer un projet Vercel distinct du frontend en important le meme depot Git et en definissant `anouan-express-api` comme **Root Directory**. Vercel reconnait l'application exportee depuis `src/app.js`. Ajouter ces variables au projet API :
 
 ```text
 NODE_ENV=production
-CLIENT_URL=https://<votre-projet>.vercel.app
-ALLOWED_ORIGINS=https://<votre-projet>.vercel.app
-JWT_SECRET=<secret aleatoire de 32 caracteres minimum>
-JWT_REFRESH_SECRET=<autre secret aleatoire de 32 caracteres minimum>
-CINETPAY_NOTIFY_URL=https://<api-render>.onrender.com/api/payments/webhook
-CINETPAY_RETURN_URL=https://<votre-projet>.vercel.app/payment/callback
+DATABASE_URL=<URI PostgreSQL du pooler Supabase en mode Session>
+DB_SSL=true
+JWT_SECRET=<secret aleatoire d'au moins 32 caracteres>
+JWT_REFRESH_SECRET=<autre secret aleatoire d'au moins 32 caracteres>
+ALLOWED_ORIGINS=https://<domaine-frontend>.vercel.app
+CLIENT_URL=https://<domaine-frontend>.vercel.app
+APP_URL=https://<domaine-api>.vercel.app
 ```
 
-Ajouter également les variables PostgreSQL (`DATABASE_URL` ou `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`) et les identifiants réellement utilisés : CinetPay, SMTP, Infobip et Firebase. Les deux secrets JWT doivent être distincts et ne doivent jamais reprendre les valeurs de `.env.example`.
+Recuperer `DATABASE_URL` dans Supabase > Project Settings > Database > Connection string. Garder cette URI et les secrets JWT uniquement dans les variables d'environnement du projet API, jamais dans le frontend. Ajouter aussi les variables des services tiers utilises (CinetPay, SMTP, Infobip, Firebase). Executer les migrations sur cette base Supabase avant de tester l'inscription.
 
-### Vercel — frontend
+### 2. Relier le frontend a l'API
 
-Dans les variables d’environnement du projet Vercel, configurer pour l’environnement Production :
+Dans le projet Vercel du frontend, configurer `VITE_API_URL` :
 
 ```text
-VITE_API_URL=https://<api-render>.onrender.com/api
+VITE_API_URL=https://<domaine-api>.vercel.app/api
 ```
 
-Après modification de `VITE_API_URL`, relancer un déploiement Vercel : les variables `VITE_*` sont intégrées au build frontend.
+Redéployer le frontend apres chaque modification de cette variable : Vite l'integre au build. `NEXT_PUBLIC_SUPABASE_URL` ne configure pas l'API Express et n'est pas lu par ce frontend.
 
-### Vérification avant mise en ligne
+### 3. Verifier
 
-Depuis `anouan-express-api` :
+Tester `https://<domaine-api>.vercel.app/health`, puis l'inscription et la connexion depuis le domaine frontend. En production, ne pas utiliser `*` dans `ALLOWED_ORIGINS` avec les cookies d'authentification.
 
-```bash
-npm test -- --runInBand
-node scripts/deploy-check.js
-```
-
-Tester ensuite `https://<api-render>.onrender.com/health`, la connexion frontend, le rafraîchissement de session, un paiement de test et la réception du webhook CinetPay. Ne pas utiliser `*` dans `ALLOWED_ORIGINS` avec les cookies d’authentification.
+Vercel Functions ne fournissent pas de disque persistant pour `uploads/` et ne remplacent pas un serveur Socket.IO persistant. Les fichiers envoyes et les fonctions temps reel necessitent un stockage objet (par exemple Supabase Storage) et un service WebSocket compatible ; le deploiement API ci-dessus couvre les routes HTTP.
