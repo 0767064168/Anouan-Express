@@ -140,7 +140,7 @@ export default function ClientLayout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    navigate('/auth/login');
   };
 
   // Bannières actives provenant de la base de données
