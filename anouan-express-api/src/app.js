@@ -95,7 +95,18 @@ app.use('/api', globalLimiter);
 // ─── Fichiers statiques (uploads) ────────────────────────────
 app.use('/uploads', express.static(path.resolve(env.upload.dir)));
 
-// ─── Route de santé ──────────────────────────────────────────
+// ─── Route d'accueil & Santé ─────────────────────────────────
+app.get(['/', '/api'], (req, res) => {
+  res.json({
+    success: true,
+    message: "Bienvenue sur l'API Anouan Express",
+    app: env.app.name,
+    version: '1.0.0',
+    status: 'online',
+    health: '/health',
+  });
+});
+
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
