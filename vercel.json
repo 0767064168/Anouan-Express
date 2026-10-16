@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "buildCommand": "npm ci && npm run build --workspace=anouan-express-web",
+  "outputDirectory": "anouan-express-web/dist",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "anouan-express-api/src/**"
+    }
+  },
+  "rewrites": [
+    { "source": "/api", "destination": "/api/index.js" },
+    { "source": "/api/(.*)", "destination": "/api/index.js" },
+    { "source": "/health", "destination": "/api/index.js" },
+    { "source": "/uploads", "destination": "/api/index.js" },
+    { "source": "/uploads/(.*)", "destination": "/api/index.js" },
+    { "source": "/socket.io", "destination": "/api/index.js" },
+    { "source": "/socket.io/(.*)", "destination": "/api/index.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

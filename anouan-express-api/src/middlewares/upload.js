@@ -11,6 +11,7 @@ const { AppError } = require('./errorHandler');
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const ALLOWED_DOC_TYPES = ['application/pdf', ...ALLOWED_IMAGE_TYPES];
+const isVercel = Boolean(process.env.VERCEL);
 
 /**
  * Crée le répertoire de destination s'il n'existe pas
@@ -25,7 +26,7 @@ const ensureDir = (dirPath) => {
  * Crée un storage Multer pour un sous-dossier donné
  */
 const createStorage = (subfolder) =>
-  multer.diskStorage({
+  isVercel ? multer.memoryStorage() : multer.diskStorage({
     destination: (req, file, cb) => {
       const dest = path.join(env.upload.dir, subfolder);
       ensureDir(dest);
@@ -36,6 +37,39 @@ const createStorage = (subfolder) =>
       cb(null, `${uuidv4()}${ext}`);
     },
   });
+
+const uploadToSupabase = async (file, subfolder) => {
+  const { supabaseUrl, serviceRoleKey, bucket } = env.storage;
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new AppError('Supabase Storage n’est pas configuré pour les uploads.', 503, 'STORAGE_NOT_CONFIGURED');
+  }
+
+  if (!file.filename) {
+    file.filename = `${uuidv4()}${path.extname(file.originalname).toLowerCase()}`;
+  }
+
+  const objectPath = `${subfolder}/${file.filename}`
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  const response = await fetch(
+    `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${encodeURIComponent(bucket)}/${objectPath}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+        'Content-Type': file.mimetype,
+        'x-upsert': 'true',
+      },
+      body: file.buffer,
+    }
+  );
+
+  if (!response.ok) {
+    throw new AppError(`Échec du stockage Supabase (${response.status}).`, 502, 'STORAGE_UPLOAD_FAILED');
+  }
+};
 
 /**
  * Filtre pour n'accepter que les images
@@ -124,9 +158,16 @@ const uploadMessageAttachment = multer({
 /**
  * Wrapper pour transformer les erreurs Multer en AppError
  */
-const handleMulterError = (uploader) => (req, res, next) => {
+const handleMulterError = (uploader, subfolder) => (req, res, next) => {
   uploader(req, res, (err) => {
-    if (!err) return next();
+    if (!err) {
+      if (!isVercel) return next();
+      const files = req.files || (req.file ? [req.file] : []);
+      if (files.length === 0) return next();
+      return Promise.all(files.map((file) => uploadToSupabase(file, subfolder)))
+        .then(() => next())
+        .catch(next);
+    }
     if (err.code === 'LIMIT_FILE_SIZE') {
       return next(new AppError(`Fichier trop volumineux (max ${env.upload.maxSizeMb} Mo).`, 400, 'FILE_TOO_LARGE'));
     }
@@ -138,11 +179,11 @@ const handleMulterError = (uploader) => (req, res, next) => {
 };
 
 module.exports = {
-  uploadProductImages: handleMulterError(uploadProductImages),
-  uploadAvatar: handleMulterError(uploadAvatar),
-  uploadBanner: handleMulterError(uploadBanner),
-  uploadLegalDoc: handleMulterError(uploadLegalDoc),
-  uploadReviewImages: handleMulterError(uploadReviewImages),
-  uploadDisputeImages: handleMulterError(uploadDisputeImages),
-  uploadMessageAttachment: handleMulterError(uploadMessageAttachment),
+  uploadProductImages: handleMulterError(uploadProductImages, 'products'),
+  uploadAvatar: handleMulterError(uploadAvatar, 'avatars'),
+  uploadBanner: handleMulterError(uploadBanner, 'banners'),
+  uploadLegalDoc: handleMulterError(uploadLegalDoc, 'legal'),
+  uploadReviewImages: handleMulterError(uploadReviewImages, 'reviews'),
+  uploadDisputeImages: handleMulterError(uploadDisputeImages, 'disputes'),
+  uploadMessageAttachment: handleMulterError(uploadMessageAttachment, 'messages'),
 };

@@ -45,6 +45,23 @@ export default function OrderTrackingPage() {
     return () => window.removeEventListener('anouan_order_status_updated', handleSync);
   }, [orderId]);
 
+  useEffect(() => {
+    let active = true;
+    const refreshOrder = async () => {
+      try {
+        const response = await ordersAPI.getById(orderId);
+        const data = response.data?.data || response.data;
+        if (active && data) setOrder(data);
+      } catch {}
+    };
+
+    const intervalId = window.setInterval(refreshOrder, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, [orderId]);
+
   // Écoute Socket.io en temps réel pour la commande (avec fallback SSE)
   useEffect(() => {
     let cleanupSocket = () => {};

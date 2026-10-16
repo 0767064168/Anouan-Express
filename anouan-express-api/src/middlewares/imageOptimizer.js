@@ -9,7 +9,7 @@ const fs = require('fs');
  * Middleware qui optimise une image uploadée par Multer
  */
 const optimizeUploadedImage = async (req, res, next) => {
-  if (!req.file) return next();
+  if (!req.file?.path) return next();
 
   try {
     const originalPath = req.file.path;

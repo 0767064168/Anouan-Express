@@ -11,6 +11,8 @@ const required = (key) => {
 const optional = (key, defaultVal = '') => process.env[key] || defaultVal;
 const isJestRuntime = !!process.env.JEST_WORKER_ID;
 const appEnv = optional('NODE_ENV', isJestRuntime ? 'test' : 'development');
+const vercelUrl = optional('VERCEL_URL');
+const appUrl = optional('APP_URL', vercelUrl ? `https://${vercelUrl}` : 'http://localhost:5000');
 const jwtSecret = optional('JWT_SECRET', 'dev_only_change_me_32_characters_minimum');
 const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'dev_only_refresh_change_me_32_chars');
 const defaultAllowedOrigins = [
@@ -37,7 +39,7 @@ const configuredOrigins = optional('ALLOWED_ORIGINS')
 if (appEnv === 'production') {
   const invalidSecret = (value) => !value || value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme') || value.startsWith('test');
   if (invalidSecret(jwtSecret) || invalidSecret(jwtRefreshSecret) || jwtSecret === jwtRefreshSecret) {
-    console.warn('⚠️ [ENV] JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes et distinctes dans Vercel.');
+     throw new Error('JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes et distinctes en production.');
   }
 }
 
@@ -46,8 +48,8 @@ module.exports = {
     env: appEnv,
     port: parseInt(optional('PORT', '5000'), 10),
     name: optional('APP_NAME', 'Anouan Express API'),
-    url: optional('APP_URL', 'http://localhost:5000'),
-    clientUrl: optional('CLIENT_URL', 'http://localhost:3000'),
+    url: optional('APP_URL', appUrl),
+    clientUrl: optional('CLIENT_URL', appUrl),
   },
 
   db: {
@@ -72,8 +74,14 @@ module.exports = {
   },
 
   upload: {
-    dir: optional('UPLOAD_DIR', 'uploads'),
+    dir: optional('UPLOAD_DIR', process.env.VERCEL ? '/tmp/anouan-express-uploads' : 'uploads'),
     maxSizeMb: parseInt(optional('UPLOAD_MAX_SIZE_MB', '5'), 10),
+  },
+
+  storage: {
+    supabaseUrl: optional('SUPABASE_URL'),
+    serviceRoleKey: optional('SUPABASE_SERVICE_ROLE_KEY'),
+    bucket: optional('SUPABASE_STORAGE_BUCKET', 'anouan-uploads'),
   },
 
   payment: {
@@ -125,8 +133,8 @@ module.exports = {
   cors: {
     origins: [...new Set(
       appEnv === 'production'
-        ? configuredOrigins
-        : [...configuredOrigins, ...defaultAllowedOrigins]
+        ? [...configuredOrigins, appUrl]
+         : [...configuredOrigins, ...defaultAllowedOrigins]
     )],
   },
 };

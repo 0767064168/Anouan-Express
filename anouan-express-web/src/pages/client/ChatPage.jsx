@@ -183,6 +183,30 @@ export default function ChatPage() {
     }
   }, [activeConvId]);
 
+  useEffect(() => {
+    if (!activeConvId || Number.isNaN(Number(activeConvId))) return;
+
+    const refreshMessages = async () => {
+      try {
+        const res = await messagesAPI.getMessages(activeConvId);
+        const msgs = res?.data?.data || res?.data || [];
+        if (Array.isArray(msgs)) {
+          setDbMessages(msgs.map((message) => ({
+            id: message.id,
+            sender: message.sender_id === user?.id ? 'client' : 'vendor',
+            text: message.content,
+            attachmentUrl: getAssetUrl(message.attachment_url),
+            time: new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: message.is_read ? 'read' : 'sent',
+          })).reverse());
+        }
+      } catch {}
+    };
+
+    const intervalId = window.setInterval(refreshMessages, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [activeConvId, user?.id]);
+
   // Écoute en temps réel des nouveaux messages entrants via Socket.io
   useEffect(() => {
     const socket = getSocket();

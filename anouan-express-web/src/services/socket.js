@@ -38,6 +38,7 @@ export const getSocketUrl = (origin = typeof window !== 'undefined' ? window.loc
 };
 
 export const connectSocket = (token, userId) => {
+  if (!import.meta.env.DEV) return null;
   if (socket?.connected) return socket;
 
   const url = getSocketUrl();

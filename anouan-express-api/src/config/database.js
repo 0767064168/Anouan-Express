@@ -15,7 +15,7 @@ const poolConfig = env.db.connectionString
   ? {
       connectionString: env.db.connectionString,
       ssl: isSslRequired ? { rejectUnauthorized: false } : false,
-      max: 20,
+      max: process.env.VERCEL ? 2 : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     }
@@ -26,7 +26,7 @@ const poolConfig = env.db.connectionString
       user: env.db.user,
       password: env.db.password,
       ssl: isSslRequired ? { rejectUnauthorized: false } : false,
-      max: 20,
+      max: process.env.VERCEL ? 2 : 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     };

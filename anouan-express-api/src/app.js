@@ -2,6 +2,7 @@
 // Point d'entrée principal de l'API Anouan Express
 
 const express = require('express');
+const fs = require('fs');
 const http = require('http');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -93,7 +94,47 @@ if (env.app.env !== 'test') {
 app.use('/api', globalLimiter);
 
 // ─── Fichiers statiques (uploads) ────────────────────────────
+if (process.env.VERCEL) {
+  app.use('/uploads', async (req, res, next) => {
+    const { supabaseUrl, serviceRoleKey, bucket } = env.storage;
+    if (!supabaseUrl || !serviceRoleKey) {
+      return res.status(503).json({ success: false, message: 'Supabase Storage n’est pas configuré.' });
+    }
+
+    const objectPath = req.path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    if (!objectPath) return next();
+
+    try {
+      const response = await fetch(
+        `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${objectPath}`,
+        {
+          method: 'POST',
+          headers: {
+            apikey: serviceRoleKey,
+            Authorization: `Bearer ${serviceRoleKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ expiresIn: 3600 }),
+        }
+      );
+      if (!response.ok) {
+        return res.status(404).json({ success: false, message: 'Fichier introuvable dans Supabase Storage.' });
+      }
+      const { signedURL } = await response.json();
+      return res.redirect(302, new URL(signedURL, supabaseUrl).toString());
+    } catch (error) {
+      return next(error);
+    }
+  });
+}
 app.use('/uploads', express.static(path.resolve(env.upload.dir)));
+
+// Serve the Vite build when the frontend is deployed with the API.
+const webBuildPath = path.resolve(__dirname, '../../anouan-express-web/dist');
+const hasWebBuild = fs.existsSync(path.join(webBuildPath, 'index.html'));
+if (hasWebBuild) {
+  app.use(express.static(webBuildPath));
+}
 
 // ─── Route d'accueil & Santé ─────────────────────────────────
 app.get(['/', '/api'], (req, res) => {
@@ -136,13 +177,31 @@ app.use(`${API}/notifications`, notificationsRoutes);
 app.use(`${API}/finance`,       financeRoutes);
 app.use(`${API}/admin`,         adminRoutes);
 
+app.use((req, res, next) => {
+  if (
+    !hasWebBuild ||
+    req.method !== 'GET' ||
+    req.path === '/health' ||
+    req.path === API ||
+    req.path.startsWith(`${API}/`) ||
+    req.path === '/uploads' ||
+    req.path.startsWith('/uploads/') ||
+    req.path === '/socket.io' ||
+    req.path.startsWith('/socket.io/')
+  ) {
+    return next();
+  }
+
+  return res.sendFile(path.join(webBuildPath, 'index.html'));
+});
+
 // ─── Gestion des erreurs ──────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
 // ─── Démarrage ────────────────────────────────────────────────
-const server = http.createServer(app);
-const io = initSocket(server);
+const server = process.env.VERCEL ? null : http.createServer(app);
+const io = server ? initSocket(server) : null;
 
 const start = async () => {
   try {

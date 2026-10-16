@@ -167,39 +167,16 @@ Voir `.env.example` pour la liste complète.
 | `SMTP_*` | Configuration email |
 | `INFOBIP_*` | Passerelle SMS |
 
-## Deploiement Vercel + Supabase
+## Deploiement Vercel unifie
 
-Le backend utilise Supabase comme PostgreSQL via `DATABASE_URL`. Il ne depend pas de Supabase Auth : l'inscription et les sessions restent gerees par Express.
+La configuration `vercel.json` a la racine construit la boutique React/Vite et expose l'API Express sous `/api` dans le meme projet Vercel. Les deux sous-projets restent dans leurs dossiers respectifs, mais partagent une URL publique. L'API se connecte a Supabase PostgreSQL via `DATABASE_URL`; l'authentification reste geree par Express.
 
-### 1. Deployer l'API Express sur Vercel
+1. Importer le depot complet dans Vercel et laisser **Root Directory** a la racine du depot.
+2. Ajouter dans les variables Vercel `DATABASE_URL` (URI du pooler Supabase en mode Session, port 5432), `DB_SSL=true`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET=anouan-uploads`, `JWT_SECRET` et `JWT_REFRESH_SECRET`. Configurer aussi les variables des services utilises (CinetPay, SMTP, Infobip, Firebase). Pour un domaine personnalise, definir `APP_URL` et `CLIENT_URL` avec ce domaine.
+3. Recuperer l'URI dans Supabase > Project Settings > Database > Connect. Appliquer les migrations avec `npm run migrate` depuis `anouan-express-api`, puis verifier `/health` et les parcours de la boutique sur l'URL Vercel.
 
-Creer un projet Vercel distinct du frontend en important le meme depot Git et en definissant `anouan-express-api` comme **Root Directory**. Vercel reconnait l'application exportee depuis `src/app.js`. Ajouter ces variables au projet API :
+Le frontend utilise `/api` sur son origine courante; aucune URL API separee n'est necessaire. Les variables `DATABASE_URL` et les secrets JWT doivent rester dans l'environnement serveur, jamais dans Vite.
 
-```text
-NODE_ENV=production
-DATABASE_URL=<URI PostgreSQL du pooler Supabase en mode Session>
-DB_SSL=true
-JWT_SECRET=<secret aleatoire d'au moins 32 caracteres>
-JWT_REFRESH_SECRET=<autre secret aleatoire d'au moins 32 caracteres>
-ALLOWED_ORIGINS=https://<domaine-frontend>.vercel.app
-CLIENT_URL=https://<domaine-frontend>.vercel.app
-APP_URL=https://<domaine-api>.vercel.app
-```
+Les fonctions Vercel ne gardent pas de processus ni de disque persistant. Socket.IO est reserve au developpement; les builds de production (web et mobile) utilisent le polling du chat (5 secondes) et du suivi de commande (10 secondes).
 
-Recuperer `DATABASE_URL` dans Supabase > Project Settings > Database > Connection string. Garder cette URI et les secrets JWT uniquement dans les variables d'environnement du projet API, jamais dans le frontend. Ajouter aussi les variables des services tiers utilises (CinetPay, SMTP, Infobip, Firebase). Executer les migrations sur cette base Supabase avant de tester l'inscription.
-
-### 2. Relier le frontend a l'API
-
-Dans le projet Vercel du frontend, configurer `VITE_API_URL` :
-
-```text
-VITE_API_URL=https://<domaine-api>.vercel.app/api
-```
-
-Redéployer le frontend apres chaque modification de cette variable : Vite l'integre au build. `NEXT_PUBLIC_SUPABASE_URL` ne configure pas l'API Express et n'est pas lu par ce frontend.
-
-### 3. Verifier
-
-Tester `https://<domaine-api>.vercel.app/health`, puis l'inscription et la connexion depuis le domaine frontend. En production, ne pas utiliser `*` dans `ALLOWED_ORIGINS` avec les cookies d'authentification.
-
-Vercel Functions ne fournissent pas de disque persistant pour `uploads/` et ne remplacent pas un serveur Socket.IO persistant. Les fichiers envoyes et les fonctions temps reel necessitent un stockage objet (par exemple Supabase Storage) et un service WebSocket compatible ; le deploiement API ci-dessus couvre les routes HTTP.
+Pour les fichiers, creer un bucket prive `anouan-uploads` dans Supabase Storage. Ajouter `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` et `SUPABASE_STORAGE_BUCKET=anouan-uploads` aux variables serveur Vercel. La cle service-role ne doit jamais etre ajoutee au frontend; l'API genere des URL signees temporaires pour lire les fichiers.
