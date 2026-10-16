@@ -11,7 +11,7 @@
 |--------|-------------|
 | Runtime | Node.js |
 | Framework | Express 4 |
-| Base de données | PostgreSQL |
+| Base de données | Supabase PostgreSQL |
 | Authentification | JWT (access 15min + refresh 7j) |
 | Validation | Joi |
 | Upload | Multer |
@@ -28,7 +28,7 @@
 
 ### 1. Prérequis
 - Node.js ≥ 18
-- PostgreSQL ≥ 14
+- Un projet Supabase (PostgreSQL)
 - Un compte CinetPay (ou autre agrégateur) pour les paiements
 
 ### 2. Installation
@@ -43,17 +43,18 @@ copy .env.example .env
 # Éditez .env avec vos valeurs (DB, JWT secret, SMTP, etc.)
 ```
 
-### 4. Base de données
+### 4. Base de données Supabase
 ```bash
-# Créer la base de données
-psql -U postgres -c "CREATE DATABASE anouan_express;"
+# Renseigner DATABASE_URL dans .env avec l'URI Supabase
+# Project Settings > Database > Connection String > URI
+# Sur Render/IPv4, choisir le pooler en mode Session (port 5432)
+# Activer aussi DB_SSL=true
 
-# Exécuter toutes les migrations + seeds
-npm run migrate:unix
-
-# Ou sous Windows PowerShell avec les variables DB_* configurées
+# Exécuter les migrations et les seeds sur Supabase
 npm run migrate
 ```
+
+Sans `DATABASE_URL`, l'API et les migrations utilisent les variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` et `DB_PASSWORD` pour une base PostgreSQL locale.
 
 ### 5. Lancer le serveur
 ```bash

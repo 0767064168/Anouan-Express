@@ -9,8 +9,8 @@
     "test": "jest --runInBand",
     "db:setup": "node scripts/setup-db.js",
     "migrate:prod": "node scripts/migrate-production.js",
-    "migrate": "psql -U %DB_USER% -d %DB_NAME% -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql -f migrations/005_add_account_and_dispute_fields.sql -f migrations/006_add_flash_sale_inventory.sql -f migrations/007_add_banner_updated_at.sql -f migrations/008_add_banner_display_fields.sql -f migrations/009_add_agent_store_assignment.sql -f migrations/010_add_message_attachments.sql",
-    "migrate:unix": "psql -U $DB_USER -d $DB_NAME -f migrations/001_schema.sql -f migrations/002_seeds.sql -f migrations/003_add_flash_sale_columns.sql -f migrations/004_add_payout_destination.sql -f migrations/005_add_account_and_dispute_fields.sql -f migrations/006_add_flash_sale_inventory.sql -f migrations/007_add_banner_updated_at.sql -f migrations/008_add_banner_display_fields.sql -f migrations/009_add_agent_store_assignment.sql -f migrations/010_add_message_attachments.sql"
+    "migrate": "node scripts/migrate-production.js",
+    "migrate:unix": "node scripts/migrate-production.js"
   },
   "keywords": [
     "ecommerce",

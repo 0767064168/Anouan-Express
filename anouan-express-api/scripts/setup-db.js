@@ -12,17 +12,32 @@ const dbUser = process.env.DB_USER || 'postgres';
 const dbPassword = process.env.DB_PASSWORD || 'root';
 const dbHost = process.env.DB_HOST || 'localhost';
 const dbPort = parseInt(process.env.DB_PORT || '5432', 10);
+const connectionString = process.env.DATABASE_URL;
+const isSsl = process.env.DB_SSL === 'true' ||
+  (connectionString && (
+    connectionString.includes('supabase') ||
+    connectionString.includes('sslmode=require') ||
+    process.env.NODE_ENV === 'production'
+  ));
 const adminEmail = process.env.ADMIN_EMAIL;
 const adminPassword = process.env.ADMIN_PASSWORD;
 
+function createPool(database = dbName) {
+  const ssl = isSsl ? { rejectUnauthorized: false } : false;
+  return new Pool(connectionString
+    ? { connectionString, ssl }
+    : {
+        host: dbHost,
+        port: dbPort,
+        database,
+        user: dbUser,
+        password: dbPassword,
+        ssl,
+      });
+}
+
 async function ensureDatabaseExists() {
-  const rootPool = new Pool({
-    host: dbHost,
-    port: dbPort,
-    database: 'postgres',
-    user: dbUser,
-    password: dbPassword,
-  });
+  const rootPool = createPool('postgres');
 
   try {
     const client = await rootPool.connect();
@@ -48,19 +63,15 @@ async function runSetup() {
   }
 
   console.log('🔄 Connexion à PostgreSQL...');
-  await ensureDatabaseExists();
+  if (!connectionString) {
+    await ensureDatabaseExists();
+  }
 
-  const targetPool = new Pool({
-    host: dbHost,
-    port: dbPort,
-    database: dbName,
-    user: dbUser,
-    password: dbPassword,
-  });
+  const targetPool = createPool();
 
   try {
     const client = await targetPool.connect();
-    console.log('✅ Connecté avec succès à la base :', dbName);
+    console.log('✅ Connecté avec succès à la base :', connectionString ? 'Supabase PostgreSQL' : dbName);
 
     const schemaPath = path.join(__dirname, '../migrations/001_schema.sql');
     const seedsPath = path.join(__dirname, '../migrations/002_seeds.sql');
@@ -152,6 +163,14 @@ async function runSetup() {
       const sql009 = fs.readFileSync(migration009Path, 'utf8');
       await client.query(sql009);
       console.log('✅ Migration 009 appliquée avec succès !');
+    }
+
+    const migration010Path = path.join(__dirname, '../migrations/010_add_message_attachments.sql');
+    if (fs.existsSync(migration010Path)) {
+      console.log('📎 Application des pièces jointes des messages (010_add_message_attachments.sql)...');
+      const sql010 = fs.readFileSync(migration010Path, 'utf8');
+      await client.query(sql010);
+      console.log('✅ Migration 010 appliquée avec succès !');
     }
 
     client.release();
