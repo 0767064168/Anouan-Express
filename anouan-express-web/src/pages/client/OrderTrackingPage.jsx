@@ -51,7 +51,12 @@ export default function OrderTrackingPage() {
       try {
         const response = await ordersAPI.getById(orderId);
         const data = response.data?.data || response.data;
-        if (active && data) setOrder(data);
+        if (active && data) {
+          setOrder(data);
+          if (data.pickup_code) {
+            setPickupCode({ code: data.pickup_code, qr_data: data.pickup_qr_data });
+          }
+        }
       } catch {}
     };
 

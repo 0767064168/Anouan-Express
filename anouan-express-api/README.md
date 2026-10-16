@@ -172,7 +172,7 @@ Voir `.env.example` pour la liste complète.
 La configuration `vercel.json` a la racine construit la boutique React/Vite et expose l'API Express sous `/api` dans le meme projet Vercel. Les deux sous-projets restent dans leurs dossiers respectifs, mais partagent une URL publique. L'API se connecte a Supabase PostgreSQL via `DATABASE_URL`; l'authentification reste geree par Express.
 
 1. Importer le depot complet dans Vercel et laisser **Root Directory** a la racine du depot.
-2. Ajouter dans les variables Vercel `DATABASE_URL` (URI du pooler Supabase en mode Session, port 5432), `DB_SSL=true`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET=anouan-uploads`, `JWT_SECRET` et `JWT_REFRESH_SECRET`. Configurer aussi les variables des services utilises (CinetPay, SMTP, Infobip, Firebase). Pour un domaine personnalise, definir `APP_URL` et `CLIENT_URL` avec ce domaine.
+2. Ajouter dans les variables Vercel `VITE_API_URL=/api`, `DATABASE_URL` (URI du pooler Supabase en mode Session, port 5432), `DB_SSL=true`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET=anouan-uploads`, `JWT_SECRET` et `JWT_REFRESH_SECRET`. Configurer aussi les variables des services utilises (CinetPay, SMTP, Infobip, Firebase). Pour un domaine personnalise, definir `APP_URL` et `CLIENT_URL` avec ce domaine.
 3. Recuperer l'URI dans Supabase > Project Settings > Database > Connect. Appliquer les migrations avec `npm run migrate` depuis `anouan-express-api`, puis verifier `/health` et les parcours de la boutique sur l'URL Vercel.
 
 Le frontend utilise `/api` sur son origine courante; aucune URL API separee n'est necessaire. Les variables `DATABASE_URL` et les secrets JWT doivent rester dans l'environnement serveur, jamais dans Vite.
