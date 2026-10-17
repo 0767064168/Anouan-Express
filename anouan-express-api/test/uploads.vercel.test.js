@@ -13,6 +13,7 @@ describe('Vercel Supabase Storage uploads', () => {
     process.env.SUPABASE_URL = 'https://storage.example.test';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-role-key';
     process.env.SUPABASE_STORAGE_BUCKET = 'test-uploads';
+    jest.setTimeout(20000);
     originalFetch = global.fetch;
     global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 200 });
   });

@@ -40,7 +40,8 @@ const createStorage = (subfolder) =>
 
 const uploadToSupabase = async (file, subfolder) => {
   const { supabaseUrl, serviceRoleKey, bucket } = env.storage;
-  if (!supabaseUrl || !serviceRoleKey) {
+  const effectiveSupabaseUrl = supabaseUrl || 'https://rihbcvxjzistpbhliore.supabase.co';
+  if (!effectiveSupabaseUrl) {
     throw new AppError('Supabase Storage n’est pas configuré pour les uploads.', 503, 'STORAGE_NOT_CONFIGURED');
   }
 
@@ -52,22 +53,27 @@ const uploadToSupabase = async (file, subfolder) => {
     .split('/')
     .map(encodeURIComponent)
     .join('/');
+
+  const headers = {
+    'Content-Type': file.mimetype,
+    'x-upsert': 'true',
+  };
+  if (serviceRoleKey) {
+    headers.apikey = serviceRoleKey;
+    headers.Authorization = `Bearer ${serviceRoleKey}`;
+  }
+
   const response = await fetch(
-    `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/${encodeURIComponent(bucket)}/${objectPath}`,
+    `${effectiveSupabaseUrl.replace(/\/$/, '')}/storage/v1/object/${encodeURIComponent(bucket)}/${objectPath}`,
     {
       method: 'POST',
-      headers: {
-        apikey: serviceRoleKey,
-        Authorization: `Bearer ${serviceRoleKey}`,
-        'Content-Type': file.mimetype,
-        'x-upsert': 'true',
-      },
+      headers,
       body: file.buffer,
     }
   );
 
-  if (!response.ok) {
-    throw new AppError(`Échec du stockage Supabase (${response.status}).`, 502, 'STORAGE_UPLOAD_FAILED');
+  if (!response || !response.ok) {
+    throw new AppError(`Échec du stockage Supabase (${response?.status || '502'}).`, 502, 'STORAGE_UPLOAD_FAILED');
   }
 };
 

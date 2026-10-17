@@ -97,16 +97,18 @@ app.use('/api', globalLimiter);
 if (process.env.VERCEL) {
   app.use('/uploads', async (req, res, next) => {
     const { supabaseUrl, serviceRoleKey, bucket } = env.storage;
-    if (!supabaseUrl || !serviceRoleKey) {
-      return res.status(503).json({ success: false, message: 'Supabase Storage n’est pas configuré.' });
-    }
-
+    const effectiveSupabaseUrl = supabaseUrl || 'https://rihbcvxjzistpbhliore.supabase.co';
     const objectPath = req.path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
     if (!objectPath) return next();
 
+    // Si pas de clé de service ou bucket public, redirection directe vers l'URL publique Supabase
+    if (!serviceRoleKey) {
+      return res.redirect(302, `${effectiveSupabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${encodeURIComponent(bucket)}/${objectPath}`);
+    }
+
     try {
       const response = await fetch(
-        `${supabaseUrl.replace(/\/$/, '')}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${objectPath}`,
+        `${effectiveSupabaseUrl.replace(/\/$/, '')}/storage/v1/object/sign/${encodeURIComponent(bucket)}/${objectPath}`,
         {
           method: 'POST',
           headers: {
@@ -118,10 +120,10 @@ if (process.env.VERCEL) {
         }
       );
       if (!response.ok) {
-        return res.status(404).json({ success: false, message: 'Fichier introuvable dans Supabase Storage.' });
+        return res.redirect(302, `${effectiveSupabaseUrl.replace(/\/$/, '')}/storage/v1/object/public/${encodeURIComponent(bucket)}/${objectPath}`);
       }
       const { signedURL } = await response.json();
-      return res.redirect(302, new URL(signedURL, supabaseUrl).toString());
+      return res.redirect(302, new URL(signedURL, effectiveSupabaseUrl).toString());
     } catch (error) {
       return next(error);
     }

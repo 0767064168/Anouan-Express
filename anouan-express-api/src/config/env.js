@@ -85,8 +85,8 @@ module.exports = {
   },
 
   storage: {
-    supabaseUrl: optional('SUPABASE_URL'),
-    serviceRoleKey: optional('SUPABASE_SERVICE_ROLE_KEY'),
+    supabaseUrl: optional('SUPABASE_URL', 'https://rihbcvxjzistpbhliore.supabase.co'),
+    serviceRoleKey: optional('SUPABASE_SERVICE_ROLE_KEY', optional('SUPABASE_ANON_KEY')),
     bucket: optional('SUPABASE_STORAGE_BUCKET', 'anouan-uploads'),
   },
 
