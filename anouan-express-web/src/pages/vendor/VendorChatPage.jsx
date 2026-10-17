@@ -71,6 +71,8 @@ const VENDOR_QUICK_RESPONSES = [
   'Merci pour votre confiance ! 🙏',
 ];
 
+const isRealConv = (id) => Boolean(id && !String(id).startsWith('conv-'));
+
 export default function VendorChatPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -122,7 +124,7 @@ export default function VendorChatPage() {
 
   // Charger les messages d'une conversation depuis la BD
   useEffect(() => {
-    if (!activeConvId || isNaN(activeConvId)) {
+    if (!activeConvId || !isRealConv(activeConvId)) {
       setDbMessages([]);
       return;
     }
@@ -141,7 +143,7 @@ export default function VendorChatPage() {
   }, [activeConvId]);
 
   useEffect(() => {
-    if (!activeConvId || Number.isNaN(Number(activeConvId))) return;
+    if (!activeConvId || !isRealConv(activeConvId)) return;
 
     const refreshMessages = async () => {
       try {
@@ -160,7 +162,7 @@ export default function VendorChatPage() {
       } catch {}
     };
 
-    const intervalId = window.setInterval(refreshMessages, 5000);
+    const intervalId = window.setInterval(refreshMessages, 3000);
     return () => window.clearInterval(intervalId);
   }, [activeConvId, user?.id]);
 
@@ -192,7 +194,7 @@ export default function VendorChatPage() {
   }, [activeConvId]);
 
   const activeConv = conversations.find((c) => c.id === activeConvId) || conversations[0];
-  const activeMessages = (!isNaN(activeConvId) && dbMessages.length > 0) ? dbMessages : (activeConv?.messages || []);
+  const activeMessages = (isRealConv(activeConvId) && dbMessages.length > 0) ? dbMessages : (activeConv?.messages || []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -214,7 +216,7 @@ export default function VendorChatPage() {
     };
 
     // Envoi via API si conv réelle
-    if (!isNaN(activeConvId) && activeConvId) {
+    if (isRealConv(activeConvId)) {
       try {
         const payload = new FormData();
         payload.append('recipientId', activeConvId);

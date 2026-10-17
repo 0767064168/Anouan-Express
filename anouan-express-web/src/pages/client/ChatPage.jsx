@@ -106,6 +106,8 @@ const generateSmartReply = (text, vendorName) => {
   return `Merci pour votre message ! L'équipe de ${vendorName} prend en compte votre demande et reste à votre entière disposition.`;
 };
 
+const isRealConv = (id) => Boolean(id && !String(id).startsWith('conv-'));
+
 export default function ChatPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -163,8 +165,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (!activeConvId) return;
     const conv = conversations.find(c => c.id === activeConvId);
-    // Si c'est une vraie conv DB (id numérique)
-    if (conv && !isNaN(activeConvId)) {
+    // Si c'est une vraie conv DB
+    if (conv && isRealConv(activeConvId)) {
       setLoadingMessages(true);
       messagesAPI.getMessages(activeConvId).then(res => {
         const msgs = res?.data?.data || res?.data || [];
@@ -184,7 +186,7 @@ export default function ChatPage() {
   }, [activeConvId]);
 
   useEffect(() => {
-    if (!activeConvId || Number.isNaN(Number(activeConvId))) return;
+    if (!activeConvId || !isRealConv(activeConvId)) return;
 
     const refreshMessages = async () => {
       try {
@@ -203,7 +205,7 @@ export default function ChatPage() {
       } catch {}
     };
 
-    const intervalId = window.setInterval(refreshMessages, 5000);
+    const intervalId = window.setInterval(refreshMessages, 3000);
     return () => window.clearInterval(intervalId);
   }, [activeConvId, user?.id]);
 
@@ -236,7 +238,7 @@ export default function ChatPage() {
 
   const activeConv = conversations.find((c) => c.id === activeConvId) || conversations[0];
   // Messages: si conv DB utilise dbMessages, sinon utilise les messages locaux
-  const activeMessages = (!isNaN(activeConvId) && dbMessages.length > 0) ? dbMessages : (activeConv?.messages || []);
+  const activeMessages = (isRealConv(activeConvId) && dbMessages.length > 0) ? dbMessages : (activeConv?.messages || []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -297,7 +299,7 @@ export default function ChatPage() {
     };
 
     // Si c'est une vraie conv DB, envoyer via API
-    if (!isNaN(activeConvId) && activeConvId) {
+    if (isRealConv(activeConvId)) {
       try {
         const payload = new FormData();
         payload.append('recipientId', activeConvId);
