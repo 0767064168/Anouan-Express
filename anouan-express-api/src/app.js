@@ -154,6 +154,7 @@ app.get('/health', (req, res) => {
     app: env.app.name,
     version: '1.0.0',
     env: env.app.env,
+    database: env.db.connectionString ? 'configured' : 'not_configured',
     timestamp: new Date().toISOString(),
   });
 });
