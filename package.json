@@ -8,5 +8,9 @@
   "scripts": {
     "build": "npm run build --workspace=anouan-express-web",
     "test": "npm run test --workspace=anouan-express-api"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*",
+    "@rollup/rollup-linux-x64-musl": "*"
   }
 }

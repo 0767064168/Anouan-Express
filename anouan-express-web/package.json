@@ -39,6 +39,7 @@
     "@types/react-dom": "^18.3.0"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "4.62.3"
+    "@rollup/rollup-linux-x64-gnu": "*",
+    "@rollup/rollup-linux-x64-musl": "*"
   }
 }

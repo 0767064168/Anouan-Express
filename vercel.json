@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "installCommand": "npm install --include=dev",
+  "installCommand": "npm install --include=dev --include=optional",
   "buildCommand": "npm run build --workspace=anouan-express-web",
   "outputDirectory": "anouan-express-web/dist",
   "functions": {
