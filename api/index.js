@@ -13,6 +13,12 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.JWT_REFRESH_SECRET) {
   process.env.JWT_REFRESH_SECRET = 'e0bb70c9e08c73be0d7e246c68ff4f449e0154cde75a20a68028a2b6d98edea7';
 }
+if (!process.env.SUPABASE_URL) {
+  process.env.SUPABASE_URL = 'https://rihbcvxjzistpbhliore.supabase.co';
+}
+if (!process.env.SUPABASE_STORAGE_BUCKET) {
+  process.env.SUPABASE_STORAGE_BUCKET = 'anouan-uploads';
+}
 
 let app;
 let initError = null;
