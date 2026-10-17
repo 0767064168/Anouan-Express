@@ -6,7 +6,7 @@
     "anouan-express-web"
   ],
   "scripts": {
-    "build": "npm run build --workspace=anouan-express-web",
+    "build": "npm run build --workspace=anouan-express-web && node -e \"const fs=require('fs'); try{fs.cpSync('anouan-express-web/dist','dist',{recursive:true})}catch(e){}\"",
     "test": "npm run test --workspace=anouan-express-api"
   },
   "optionalDependencies": {

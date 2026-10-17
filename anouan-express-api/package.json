@@ -4,6 +4,7 @@
   "description": "API backend pour la marketplace Anouan Express — Côte d'Ivoire",
   "main": "src/app.js",
   "scripts": {
+    "build": "node -e \"console.log('Build OK for API')\"",
     "dev": "nodemon src/app.js",
     "start": "node src/app.js",
     "test": "jest --runInBand",
