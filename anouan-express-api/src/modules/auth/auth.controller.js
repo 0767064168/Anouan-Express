@@ -12,6 +12,16 @@ const cookieOptions = (maxAge) => ({
   path: '/',
 });
 
+const clearAuthCookies = (res) => {
+  res.clearCookie('accessToken', cookieOptions(0));
+  res.clearCookie('refreshToken', cookieOptions(0));
+  res.clearCookie(CSRF_COOKIE, {
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
+  });
+};
+
 const setAuthCookies = (res, { accessToken, refreshToken }) => {
   res.cookie('accessToken', accessToken, cookieOptions(15 * 60 * 1000));
   res.cookie('refreshToken', refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
@@ -75,15 +85,16 @@ const refresh = async (req, res, next) => {
     });
     setAuthCookies(res, data);
     res.json({ success: true, data: withoutTokens(data) });
-  } catch (err) { next(err); }
+  } catch (err) {
+    if (err.statusCode === 401) clearAuthCookies(res);
+    next(err);
+  }
 };
 
 const logout = async (req, res, next) => {
   try {
     await authService.logout(req.user.id);
-    res.clearCookie('accessToken', { path: '/' });
-    res.clearCookie('refreshToken', { path: '/' });
-    res.clearCookie(CSRF_COOKIE, { path: '/' });
+    clearAuthCookies(res);
     res.json({ success: true, message: 'Déconnecté avec succès.' });
   } catch (err) { next(err); }
 };
