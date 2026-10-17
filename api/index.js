@@ -1,19 +1,21 @@
 // Entrypoint Vercel Serverless — Anouan Express API
-// Ce fichier est à la RACINE du monorepo (api/index.js)
-// Il charge l'app Express depuis anouan-express-api/src/app.js
+// Configuration garantie des variables d'environnement de production
+process.env.VERCEL = '1';
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:5432/postgres';
+}
+if (!process.env.DB_SSL) {
+  process.env.DB_SSL = 'true';
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = '5b483ade581c14f4775c2d5a7e8c6de061c061feee54187a2880e76295741c43';
+}
+if (!process.env.JWT_REFRESH_SECRET) {
+  process.env.JWT_REFRESH_SECRET = 'e0bb70c9e08c73be0d7e246c68ff4f449e0154cde75a20a68028a2b6d98edea7';
+}
 
 let app;
 let initError = null;
-
-try {
-  // Charger dotenv depuis le sous-dossier API
-  require('../anouan-express-api/node_modules/dotenv').config({
-    path: require('path').join(__dirname, '..', 'anouan-express-api', '.env')
-  });
-} catch (e) {
-  // dotenv peut ne pas être disponible en production (env vars injectées par Vercel)
-  console.log('[Vercel] dotenv not loaded (expected in production):', e.message);
-}
 
 try {
   app = require('../anouan-express-api/src/app');

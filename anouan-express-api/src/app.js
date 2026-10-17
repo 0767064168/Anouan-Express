@@ -142,7 +142,7 @@ app.get(['/', '/api'], (req, res) => {
     success: true,
     message: "Bienvenue sur l'API Anouan Express",
     app: env.app.name,
-    version: '1.0.0',
+    version: '1.0.1',
     status: 'online',
     health: '/health',
   });
@@ -152,7 +152,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     app: env.app.name,
-    version: '1.0.0',
+    version: '1.0.1',
     env: env.app.env,
     database: env.db.connectionString ? 'configured' : 'not_configured',
     timestamp: new Date().toISOString(),
