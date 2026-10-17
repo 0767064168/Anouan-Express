@@ -9,9 +9,9 @@
 
 | Couche | Technologie |
 |--------|-------------|
-| Runtime | Node.js |
-| Framework | Express 4 |
-| Base de données | Supabase PostgreSQL |
+| Runtime | Node.js (≥ 18) |
+| Framework | Express 5 (v5.2.1) |
+| Base de données | Supabase PostgreSQL (Pooler 6543 / 5432) |
 | Authentification | JWT (access 15min + refresh 7j) |
 | Validation | Joi |
 | Upload | Multer |
@@ -45,12 +45,19 @@ copy .env.example .env
 
 ### 4. Base de données Supabase
 ```bash
-# Renseigner DATABASE_URL dans .env avec l'URI Supabase
+# Renseigner DATABASE_URL dans .env avec l'URI Supabase :
 # Project Settings > Database > Connection String > URI
-# Sur Render/IPv4, choisir le pooler en mode Session (port 5432)
-# Activer aussi DB_SSL=true
 
-# Exécuter les migrations et les seeds sur Supabase
+# Deux modes de pooler sont disponibles sur Supabase :
+# 1. Port 6543 (Transaction Pooler - Recommandé en Serverless / Vercel) :
+#    postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+# 2. Port 5432 (Session Pooler - Pour migrations locales ou serveurs persistants) :
+#    postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+
+# Activer systématiquement le SSL :
+DB_SSL=true
+
+# Exécuter les migrations et seeds sur Supabase
 npm run migrate
 ```
 
@@ -167,16 +174,23 @@ Voir `.env.example` pour la liste complète.
 | `SMTP_*` | Configuration email |
 | `INFOBIP_*` | Passerelle SMS |
 
-## Deploiement Vercel unifie
+## Déploiement Vercel unifié
 
-La configuration `vercel.json` a la racine construit la boutique React/Vite et expose l'API Express sous `/api` dans le meme projet Vercel. Les deux sous-projets restent dans leurs dossiers respectifs, mais partagent une URL publique. L'API se connecte a Supabase PostgreSQL via `DATABASE_URL`; l'authentification reste geree par Express.
+La configuration `vercel.json` à la racine construit la boutique React/Vite et expose l'API Express sous `/api` dans le même projet Vercel (`https://anouan-express.vercel.app`). L'API se connecte à Supabase PostgreSQL via `DATABASE_URL` et authentifie les utilisateurs via JWT.
 
-1. Importer le depot complet dans Vercel et laisser **Root Directory** a la racine du depot.
-2. Ajouter dans les variables Vercel `VITE_API_URL=/api`, `DATABASE_URL` (URI du pooler Supabase en mode Session, port 5432), `DB_SSL=true`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET=anouan-uploads`, `JWT_SECRET` et `JWT_REFRESH_SECRET`. Configurer aussi les variables des services utilises (CinetPay, SMTP, Infobip, Firebase). Pour un domaine personnalise, definir `APP_URL` et `CLIENT_URL` avec ce domaine.
-3. Recuperer l'URI dans Supabase > Project Settings > Database > Connect. Appliquer les migrations avec `npm run migrate` depuis `anouan-express-api`, puis verifier `/health` et les parcours de la boutique sur l'URL Vercel.
-
-Le frontend utilise `/api` sur son origine courante; aucune URL API separee n'est necessaire. Les variables `DATABASE_URL` et les secrets JWT doivent rester dans l'environnement serveur, jamais dans Vite.
-
-Les fonctions Vercel ne gardent pas de processus ni de disque persistant. Socket.IO est reserve au developpement; les builds de production (web et mobile) utilisent le polling du chat (5 secondes) et du suivi de commande (10 secondes).
-
-Pour les fichiers, creer un bucket prive `anouan-uploads` dans Supabase Storage. Ajouter `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` et `SUPABASE_STORAGE_BUCKET=anouan-uploads` aux variables serveur Vercel. La cle service-role ne doit jamais etre ajoutee au frontend; l'API genere des URL signees temporaires pour lire les fichiers.
+1. **Root Directory** : Laisser à la racine du dépôt pour le projet principal.
+2. **Variables d'environnement Vercel** :
+   - `DATABASE_URL` : URI du pooler Supabase (port `6543` en mode Transaction pooler pour serverless, ou port `5432` en session pooler) :
+     `postgresql://postgres.<PROJECT_REF>:<PASSWORD>@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`
+   - `DB_SSL=true`
+   - `JWT_SECRET` et `JWT_REFRESH_SECRET` : Clés fortes et distinctes d'au moins 32 caractères.
+   - `SUPABASE_URL` : `https://<PROJECT_REF>.supabase.co`
+   - `SUPABASE_STORAGE_BUCKET` : `anouan-uploads`
+   - `SUPABASE_SERVICE_ROLE_KEY` : (Optionnel) Clé service-role pour générer des URLs signées si le bucket est privé.
+   - Services tiers : CinetPay, Infobip, Nodemailer SMTP, Firebase Admin.
+3. **Point d'entrée Serverless** :
+   - [api/index.js](file:///c:/Users/hp/Documents/Anouan%20Express/api/index.js) (monorepo unifié) et [anouan-express-api/api/index.js](file:///c:/Users/hp/Documents/Anouan%20Express/anouan-express-api/api/index.js) (projet standalone API) garantissent le chargement des variables d'environnement en production et isolent l'Express app.
+4. **Stockage d'images (Supabase Storage)** :
+   - L'API gère automatiquement à la fois les buckets privés (génération d'URLs signées temporaires sécurisées) et les buckets publics (redirection directe haute performance vers le CDN public Supabase `/storage/v1/object/public/...`).
+5. **Temps réel et polling** :
+   - Les fonctions Vercel étant stateless, Socket.IO est actif en local, tandis que la production (web et application mobile Android) utilise un rafraîchissement périodique optimisé (polling 3s pour le chat actif, 10s pour le suivi de commande).
