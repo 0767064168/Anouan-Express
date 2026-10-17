@@ -1,7 +1,12 @@
-﻿// src/middlewares/imageOptimizer.js
+// src/middlewares/imageOptimizer.js
 // Optimisation d'image serveur via Sharp pour Anouan Express
 
-const sharp = require('sharp');
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (err) {
+  console.warn('[Sharp] Module sharp non disponible, compression désactivée :', err.message);
+}
 const path = require('path');
 const fs = require('fs');
 
@@ -9,7 +14,7 @@ const fs = require('fs');
  * Middleware qui optimise une image uploadée par Multer
  */
 const optimizeUploadedImage = async (req, res, next) => {
-  if (!req.file?.path) return next();
+  if (!req.file?.path || !sharp) return next();
 
   try {
     const originalPath = req.file.path;
