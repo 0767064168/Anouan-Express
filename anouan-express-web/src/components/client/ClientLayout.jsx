@@ -66,6 +66,9 @@ export default function ClientLayout() {
         }
       } catch (err) {
         const status = err?.response?.status;
+        if (status === 401) {
+          await logout();
+        }
         if (status !== 401 && status !== 403) {
           console.warn('Unread notifications could not be loaded:', err?.message || 'unknown error');
         }
@@ -79,7 +82,7 @@ export default function ClientLayout() {
       clearInterval(interval);
       window.removeEventListener('anouan_order_status_updated', loadUnreadNotifs);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, logout]);
 
   useEffect(() => {
     if (theme === 'light') {
