@@ -13,8 +13,8 @@ const isJestRuntime = !!process.env.JEST_WORKER_ID;
 const appEnv = optional('NODE_ENV', isJestRuntime ? 'test' : 'development');
 const vercelUrl = optional('VERCEL_URL');
 const appUrl = optional('APP_URL', vercelUrl ? `https://${vercelUrl}` : 'http://localhost:5000');
-const jwtSecret = optional('JWT_SECRET', 'dev_only_change_me_32_characters_minimum');
-const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'dev_only_refresh_change_me_32_chars');
+const jwtSecret = optional('JWT_SECRET', '5b483ade581c14f4775c2d5a7e8c6de061c061feee54187a2880e76295741c43');
+const jwtRefreshSecret = optional('JWT_REFRESH_SECRET', 'e0bb70c9e08c73be0d7e246c68ff4f449e0154cde75a20a68028a2b6d98edea7');
 const defaultAllowedOrigins = [
   'http://localhost:3000',
   'http://localhost:4173',
@@ -53,13 +53,18 @@ module.exports = {
   },
 
   db: {
-    connectionString: optional('DATABASE_URL', ''),
+    connectionString: optional(
+      'DATABASE_URL',
+      (process.env.VERCEL || appEnv === 'production')
+        ? 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:5432/postgres'
+        : ''
+    ),
     host: optional('DB_HOST', 'localhost'),
     port: parseInt(optional('DB_PORT', '5432'), 10),
     name: optional('DB_NAME', 'anouan_express'),
     user: optional('DB_USER', 'postgres'),
     password: optional('DB_PASSWORD', ''),
-    ssl: optional('DB_SSL', 'false') === 'true',
+    ssl: optional('DB_SSL', (process.env.VERCEL || appEnv === 'production') ? 'true' : 'false') === 'true',
   },
 
   jwt: {
@@ -133,8 +138,8 @@ module.exports = {
   cors: {
     origins: [...new Set(
       appEnv === 'production'
-        ? [...configuredOrigins, appUrl]
-         : [...configuredOrigins, ...defaultAllowedOrigins]
+        ? [...configuredOrigins, appUrl, 'https://anouan-express.vercel.app']
+         : [...configuredOrigins, ...defaultAllowedOrigins, 'https://anouan-express.vercel.app']
     )],
   },
 };
