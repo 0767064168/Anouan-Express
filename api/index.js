@@ -2,7 +2,7 @@
 // Configuration garantie des variables d'environnement de production
 process.env.VERCEL = '1';
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:5432/postgres';
+  process.env.DATABASE_URL = 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:6543/postgres';
 }
 if (!process.env.DB_SSL) {
   process.env.DB_SSL = 'true';

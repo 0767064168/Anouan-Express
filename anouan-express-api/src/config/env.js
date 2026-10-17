@@ -56,7 +56,7 @@ module.exports = {
     connectionString: optional(
       'DATABASE_URL',
       (process.env.VERCEL || appEnv === 'production')
-        ? 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:5432/postgres'
+        ? 'postgresql://postgres.rihbcvxjzistpbhliore:LqEgXf6BT7EUe6iB@aws-0-eu-central-1.pooler.supabase.com:6543/postgres'
         : ''
     ),
     host: optional('DB_HOST', 'localhost'),
