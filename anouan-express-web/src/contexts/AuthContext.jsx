@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { authAPI, usersAPI } from '../services/api';
 import { connectSocket, disconnectSocket } from '../services/socket';
-import { requestNotificationPermission, saveFcmToken } from '../services/fcm';
+import { getFcmToken, saveFcmToken } from '../services/fcm';
 
 const AuthContext = createContext(null);
 
@@ -37,7 +37,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (user?.id) {
       connectSocket(null, user.id);
-      requestNotificationPermission().then(token => {
+      getFcmToken().then(token => {
         if (token) saveFcmToken(token);
       }).catch(() => {});
     } else {

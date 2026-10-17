@@ -51,9 +51,6 @@ export function useNotifications() {
   }, [isAuthenticated, addNotification]);
 
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
     connect();
     return () => { if (esRef.current) esRef.current.close(); };
   }, [connect]);

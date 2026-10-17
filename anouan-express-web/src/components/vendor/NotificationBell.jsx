@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Bell, BellOff, CheckCheck, ShoppingBag, CreditCard, Package, X, Wifi, WifiOff } from "lucide-react";
 import { useNotifications } from "../../hooks/useNotifications";
+import { requestNotificationPermission, saveFcmToken } from "../../services/fcm";
 
 const TYPE_CONFIG = {
   new_order:        { icon: ShoppingBag, color: "text-orange-400",  bg: "bg-orange-500/10" },
@@ -22,7 +23,22 @@ function timeAgo(ts) {
 export default function NotificationBell() {
   const { notifications, unreadCount, connected, markAllRead, markRead } = useNotifications();
   const [open, setOpen] = useState(false);
+  const [permission, setPermission] = useState(() =>
+    typeof Notification === "undefined" ? "unsupported" : Notification.permission
+  );
+  const [requestingPermission, setRequestingPermission] = useState(false);
   const ref = useRef(null);
+
+  const enableNotifications = async () => {
+    setRequestingPermission(true);
+    try {
+      const token = await requestNotificationPermission();
+      setPermission(Notification.permission);
+      if (token) await saveFcmToken(token);
+    } finally {
+      setRequestingPermission(false);
+    }
+  };
 
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -69,6 +85,23 @@ export default function NotificationBell() {
               </button>
             </div>
           </div>
+
+          {permission === "default" && (
+            <div className="px-4 py-3 border-b border-slate-800">
+              <button
+                onClick={enableNotifications}
+                disabled={requestingPermission}
+                className="w-full rounded-xl bg-orange-500/10 px-3 py-2 text-left text-xs font-bold text-orange-300 hover:bg-orange-500/20 disabled:opacity-50"
+              >
+                {requestingPermission ? "Activation..." : "Activer les notifications sur cet appareil"}
+              </button>
+            </div>
+          )}
+          {permission === "denied" && (
+            <p className="px-4 py-3 border-b border-slate-800 text-[10px] text-slate-400">
+              Autorisez les notifications dans les paramètres du site de votre navigateur.
+            </p>
+          )}
 
           {/* Liste */}
           <div className="max-h-80 overflow-y-auto">

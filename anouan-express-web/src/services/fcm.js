@@ -58,18 +58,12 @@ const initFirebaseMessaging = async () => {
 };
 
 /**
- * Demande la permission de notification et retourne le FCM token
+ * Retourne le token FCM uniquement si la permission a déjà été accordée.
  * @returns {Promise<string|null>} FCM token ou null
  */
-export const requestNotificationPermission = async () => {
+export const getFcmToken = async () => {
   try {
-    if (!('Notification' in window)) return null;
-
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.log('🔕 Permission notifications refusée');
-      return null;
-    }
+    if (!('Notification' in window) || Notification.permission !== 'granted') return null;
 
     const msg = await initFirebaseMessaging();
     if (!msg) return null;
@@ -80,6 +74,24 @@ export const requestNotificationPermission = async () => {
 
     console.log('🔔 FCM Token obtenu :', token?.substring(0, 30) + '...');
     return token;
+  } catch (err) {
+    console.warn('⚠️ Erreur récupération token FCM :', err.message);
+    return null;
+  }
+};
+
+/**
+ * Demande explicitement la permission de notification après une action utilisateur.
+ * @returns {Promise<string|null>} FCM token ou null
+ */
+export const requestNotificationPermission = async () => {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'default') return null;
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return null;
+
+    return getFcmToken();
   } catch (err) {
     console.warn('⚠️ Erreur récupération token FCM :', err.message);
     return null;
