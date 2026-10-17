@@ -30,6 +30,7 @@ const defaultAllowedOrigins = [
   'http://192.168.11.40:5173',
   'capacitor://localhost',
   'http://localhost',
+  'https://localhost',
 ];
 const configuredOrigins = optional('ALLOWED_ORIGINS')
   .split(',')

@@ -65,7 +65,7 @@ app.use(helmet({
 app.use(cors({
   origin: (origin, callback) => {
     // Autorise les appels sans origin (mobile apps, Postman)
-    if (!origin || env.cors.origins.includes(origin) || origin === 'capacitor://localhost' || origin === 'http://localhost') {
+    if (!origin || env.cors.origins.includes(origin) || origin === 'capacitor://localhost' || origin === 'http://localhost' || origin === 'https://localhost') {
       callback(null, true);
     } else {
       callback(new Error(`CORS: Origine non autorisée — ${origin}`));
