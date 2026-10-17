@@ -40,7 +40,7 @@ const configuredOrigins = optional('ALLOWED_ORIGINS')
 if (appEnv === 'production') {
   const invalidSecret = (value) => !value || value.length < 32 || value.startsWith('dev_only_') || value.startsWith('changeme') || value.startsWith('test');
   if (invalidSecret(jwtSecret) || invalidSecret(jwtRefreshSecret) || jwtSecret === jwtRefreshSecret) {
-     console.warn('⚠️ [SECURITY] JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes et distinctes en production.');
+     throw new Error('JWT_SECRET et JWT_REFRESH_SECRET doivent être définis avec des valeurs fortes et distinctes en production.');
   }
 }
 
